@@ -15,6 +15,45 @@ import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
 
+// ── Week view: align to Monday and show the ISO calendar week number ──
+// Frappe Gantt has no option for week-start-day or week numbers, so the
+// shared "Week" view mode object and the date-setup routine are patched
+// directly. This runs once at module load, before any Gantt is constructed.
+function getISOWeekNumber(date: Date): number {
+	const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+	const dayNum = d.getUTCDay() || 7;
+	d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+	const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1);
+	return Math.ceil(((d.getTime() - yearStart) / 86400000 + 1) / 7);
+}
+
+const weekMode = (Gantt as unknown as { VIEW_MODE: { WEEK: Record<string, unknown> } }).VIEW_MODE.WEEK;
+const originalWeekLowerText = weekMode.lower_text as (d: Date, ld: Date, lang: string) => string;
+weekMode.lower_text = (d: Date, ld: Date, lang: string) =>
+	`W${getISOWeekNumber(d)} · ${originalWeekLowerText(d, ld, lang)}`;
+weekMode.column_width = 160;
+
+const ganttProto = Gantt.prototype as unknown as {
+	setup_gantt_dates: (refresh?: boolean) => void;
+	setup_date_values: () => void;
+	setup_dates: (refresh?: boolean) => void;
+	gantt_start: Date;
+	config: { view_mode?: { name?: string } };
+};
+ganttProto.setup_dates = function (this: typeof ganttProto, refresh?: boolean): void {
+	this.setup_gantt_dates(refresh);
+	if (this.config.view_mode?.name === 'Week') {
+		// Roll the computed grid start back to the Monday on/before it so
+		// week columns always begin on Monday instead of an arbitrary day.
+		const day = this.gantt_start.getDay();
+		const diffToMonday = (day + 6) % 7;
+		if (diffToMonday > 0) {
+			this.gantt_start.setDate(this.gantt_start.getDate() - diffToMonday);
+		}
+	}
+	this.setup_date_values();
+};
+
 export class GanttChartView extends BasesView {
 	type = 'gantt';
 
