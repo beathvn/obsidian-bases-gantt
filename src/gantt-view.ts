@@ -85,9 +85,17 @@ export class GanttChartView extends BasesView {
 	/** Recent drag-caused frontmatter writes, most recent last. */
 	private undoStack: UndoBatch[] = [];
 	private static readonly MAX_UNDO_ENTRIES = 20;
-	/** Batches same-tick on_date_change/on_progress_change calls into one undo step. */
+	/**
+	 * Batches on_date_change/on_progress_change calls into one undo step per
+	 * drag gesture. Frappe Gantt fires on_date_change on every mousemove tick
+	 * that crosses a day boundary (not just once at mouseup), so this is
+	 * debounced rather than flushed on the next microtask — otherwise a
+	 * single drag across several days would queue a separate undo entry (and
+	 * Notice) per day.
+	 */
 	private pendingUndoBatch: UndoBatch | null = null;
-	private undoBatchFlushQueued = false;
+	private undoFlushTimer: number | null = null;
+	private static readonly UNDO_BATCH_DEBOUNCE_MS = 500;
 
 	constructor(controller: QueryController, containerEl: HTMLElement) {
 		super(controller);
@@ -116,6 +124,10 @@ export class GanttChartView extends BasesView {
 		this.taskMap.clear();
 		this.undoStack = [];
 		this.pendingUndoBatch = null;
+		if (this.undoFlushTimer !== null) {
+			window.clearTimeout(this.undoFlushTimer);
+			this.undoFlushTimer = null;
+		}
 	}
 
 	onResize(): void {
@@ -151,19 +163,28 @@ export class GanttChartView extends BasesView {
 		if (!this.pendingUndoBatch) {
 			this.pendingUndoBatch = { description, changes: [] };
 		}
-		this.pendingUndoBatch.changes.push({ filePath, previous });
-		if (!this.undoBatchFlushQueued) {
-			this.undoBatchFlushQueued = true;
-			// Frappe Gantt fires one on_date_change/on_progress_change per affected
-			// task synchronously within the same mouseup handler (e.g. dependents
-			// dragged along with their parent) — a microtask flush groups them
-			// into a single undo step and a single Notice.
-			queueMicrotask(() => this.flushUndoBatch());
+		// Keep only the first (pre-drag) "previous" per file: on_date_change
+		// re-fires on every day boundary crossed during a single drag, and
+		// undo should restore to before the drag started, not to the
+		// second-to-last day.
+		const existing = this.pendingUndoBatch.changes.find((c) => c.filePath === filePath);
+		if (existing) {
+			// New call's values win only for keys not already recorded.
+			existing.previous = { ...previous, ...existing.previous };
+		} else {
+			this.pendingUndoBatch.changes.push({ filePath, previous });
 		}
+
+		if (this.undoFlushTimer !== null) {
+			window.clearTimeout(this.undoFlushTimer);
+		}
+		this.undoFlushTimer = window.setTimeout(() => {
+			this.undoFlushTimer = null;
+			this.flushUndoBatch();
+		}, GanttChartView.UNDO_BATCH_DEBOUNCE_MS);
 	}
 
 	private flushUndoBatch(): void {
-		this.undoBatchFlushQueued = false;
 		const batch = this.pendingUndoBatch;
 		this.pendingUndoBatch = null;
 		if (!batch || batch.changes.length === 0) return;
