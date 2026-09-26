@@ -86,8 +86,6 @@ export class GanttChartView extends BasesView {
 	private configSnapshot = '';
 	private currentTasks: GanttTask[] = [];
 	private taskMap: Map<string, GanttTask> = new Map();
-	/** Flag to suppress on_click after a drag operation. */
-	private justDragged = false;
 	/**
 	 * True from the first on_date_change/on_progress_change of a drag until
 	 * ~500ms after the last one. While true, onDataUpdated skips rebuilding
@@ -497,8 +495,13 @@ export class GanttChartView extends BasesView {
 			},
 
 			on_click: (task) => {
-				// Suppress click that fires immediately after a drag/resize
-				if (this.justDragged) return;
+				// Frappe fires a plain DOM "click" on the bar group on mouseup
+				// with no drag-awareness of its own, so a drag or resize that
+				// ends with the mouse over the bar would otherwise also open
+				// the note. isDragging spans the whole gesture (see
+				// queueUndo/flushUndoBatch), so it's still true for the click
+				// that immediately follows a drag-ending mouseup.
+				if (this.isDragging) return;
 				// Ignore group header phantom tasks
 				if (task.id.startsWith(GROUP_HEADER_PREFIX)) return;
 				const ganttTask = this.findTask(task.id);
@@ -508,9 +511,6 @@ export class GanttChartView extends BasesView {
 			},
 
 			on_date_change: (task, start, end) => {
-				this.justDragged = true;
-				setTimeout(() => { this.justDragged = false; }, 50);
-
 				if (task.id.startsWith(GROUP_HEADER_PREFIX)) return;
 				const ganttTask = this.findTask(task.id);
 				if (!ganttTask) return;
