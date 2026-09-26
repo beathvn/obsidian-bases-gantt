@@ -88,6 +88,14 @@ export class GanttChartView extends BasesView {
 	private taskMap: Map<string, GanttTask> = new Map();
 	/** Flag to suppress on_click after a drag operation. */
 	private justDragged = false;
+	/**
+	 * True from the first on_date_change/on_progress_change of a drag until
+	 * ~500ms after the last one. While true, onDataUpdated skips rebuilding
+	 * the task list — the live per-tick writes a drag produces would
+	 * otherwise re-sort rows and reset scroll position under the user's
+	 * mouse while they're still dragging.
+	 */
+	private isDragging = false;
 	/** Global mouseup handlers Frappe Gantt registers on document (for cleanup). */
 	private capturedGlobalHandlers: EventListener[] = [];
 	/** Recent drag-caused frontmatter writes, most recent last. */
@@ -132,6 +140,7 @@ export class GanttChartView extends BasesView {
 		this.taskMap.clear();
 		this.undoStack = [];
 		this.pendingUndoBatch = null;
+		this.isDragging = false;
 		if (this.undoFlushTimer !== null) {
 			window.clearTimeout(this.undoFlushTimer);
 			this.undoFlushTimer = null;
@@ -173,6 +182,7 @@ export class GanttChartView extends BasesView {
 		previous: Record<string, string | number>,
 		next: Record<string, string | number>,
 	): void {
+		this.isDragging = true;
 		if (!this.pendingUndoBatch) {
 			this.pendingUndoBatch = { description, changes: [] };
 		}
@@ -199,8 +209,14 @@ export class GanttChartView extends BasesView {
 	}
 
 	private flushUndoBatch(): void {
+		this.isDragging = false;
 		const batch = this.pendingUndoBatch;
 		this.pendingUndoBatch = null;
+
+		// Row order/positions weren't rebuilt during the drag (see
+		// onDataUpdated); catch up now that it's over.
+		this.onDataUpdated();
+
 		if (!batch) return;
 
 		// Drop no-op changes — e.g. the bar was dragged out and back to
@@ -262,6 +278,12 @@ export class GanttChartView extends BasesView {
 
 	onDataUpdated(): void {
 		if (!this.data?.data || !this.ganttEl) return;
+		// A drag writes frontmatter live (per day boundary crossed, not just
+		// on mouseup), which round-trips back here mid-drag. Rebuilding the
+		// task list now would re-sort rows and jump the scroll position
+		// under the user's mouse; flushUndoBatch() re-runs this once the
+		// drag actually ends instead.
+		if (this.isDragging) return;
 
 		const config = this.getTaskMapperConfig();
 		const newSnapshot = JSON.stringify(config) + '|' + this.getDisplayConfigSnapshot();
