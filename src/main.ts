@@ -26,6 +26,17 @@ export default class BasesGanttPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: 'gantt-undo',
+			name: 'Undo last change',
+			icon: 'undo-2',
+			checkCallback: (checking) => {
+				const view = this.getActiveGanttView();
+				if (checking) return !!view;
+				view?.undoLastChange();
+			},
+		});
+
+		this.addCommand({
 			id: 'gantt-create-task',
 			name: 'Create new task',
 			icon: 'plus',

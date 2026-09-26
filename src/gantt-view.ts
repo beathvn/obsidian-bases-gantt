@@ -54,6 +54,18 @@ ganttProto.setup_dates = function (this: typeof ganttProto, refresh?: boolean): 
 	this.setup_date_values();
 };
 
+/** One file's prior frontmatter values, so a drag-caused write can be reverted. */
+interface UndoFileChange {
+	filePath: string;
+	previous: Record<string, string | number>;
+}
+
+/** One undo-able user gesture (a single drag can touch several dependent tasks at once). */
+interface UndoBatch {
+	description: string;
+	changes: UndoFileChange[];
+}
+
 export class GanttChartView extends BasesView {
 	type = 'gantt';
 
@@ -70,6 +82,12 @@ export class GanttChartView extends BasesView {
 	private justDragged = false;
 	/** Global mouseup handlers Frappe Gantt registers on document (for cleanup). */
 	private capturedGlobalHandlers: EventListener[] = [];
+	/** Recent drag-caused frontmatter writes, most recent last. */
+	private undoStack: UndoBatch[] = [];
+	private static readonly MAX_UNDO_ENTRIES = 20;
+	/** Batches same-tick on_date_change/on_progress_change calls into one undo step. */
+	private pendingUndoBatch: UndoBatch | null = null;
+	private undoBatchFlushQueued = false;
 
 	constructor(controller: QueryController, containerEl: HTMLElement) {
 		super(controller);
@@ -96,6 +114,8 @@ export class GanttChartView extends BasesView {
 		this.capturedGlobalHandlers = [];
 		this.currentTasks = [];
 		this.taskMap.clear();
+		this.undoStack = [];
+		this.pendingUndoBatch = null;
 	}
 
 	onResize(): void {
@@ -110,6 +130,69 @@ export class GanttChartView extends BasesView {
 	/** Public: scroll chart to today (for command palette). */
 	scrollToToday(): void {
 		this.gantt?.scroll_current();
+	}
+
+	/** Public: revert the most recent drag-caused frontmatter change (for command palette). */
+	undoLastChange(): void {
+		const batch = this.undoStack.pop();
+		if (!batch) {
+			new Notice('Nothing to undo.');
+			return;
+		}
+		void Promise.all(
+			batch.changes.map((change) => this.writeFrontmatter(change.filePath, change.previous))
+		).then(() => {
+			new Notice(`Undid: ${batch.description}`);
+		});
+	}
+
+	/** Queue a file's prior values for undo, batching calls from the same drag gesture. */
+	private queueUndo(filePath: string, description: string, previous: Record<string, string | number>): void {
+		if (!this.pendingUndoBatch) {
+			this.pendingUndoBatch = { description, changes: [] };
+		}
+		this.pendingUndoBatch.changes.push({ filePath, previous });
+		if (!this.undoBatchFlushQueued) {
+			this.undoBatchFlushQueued = true;
+			// Frappe Gantt fires one on_date_change/on_progress_change per affected
+			// task synchronously within the same mouseup handler (e.g. dependents
+			// dragged along with their parent) — a microtask flush groups them
+			// into a single undo step and a single Notice.
+			queueMicrotask(() => this.flushUndoBatch());
+		}
+	}
+
+	private flushUndoBatch(): void {
+		this.undoBatchFlushQueued = false;
+		const batch = this.pendingUndoBatch;
+		this.pendingUndoBatch = null;
+		if (!batch || batch.changes.length === 0) return;
+
+		this.undoStack.push(batch);
+		if (this.undoStack.length > GanttChartView.MAX_UNDO_ENTRIES) {
+			this.undoStack.shift();
+		}
+
+		const label = batch.changes.length > 1
+			? `${batch.description} (+${batch.changes.length - 1} dependent)`
+			: batch.description;
+		this.showUndoNotice(label);
+	}
+
+	/** Show a Notice with an inline "Undo" action for a just-applied drag change. */
+	private showUndoNotice(description: string): void {
+		const notice = new Notice('', 6000);
+		notice.noticeEl.empty();
+		notice.noticeEl.createSpan({ text: description });
+		const undoBtn = notice.noticeEl.createEl('button', {
+			text: 'Undo',
+			cls: 'gantt-undo-notice-btn',
+		});
+		undoBtn.addEventListener('click', (evt) => {
+			evt.stopPropagation();
+			notice.hide();
+			this.undoLastChange();
+		});
 	}
 
 	/** Public: switch view mode (for command palette). */
@@ -362,15 +445,20 @@ export class GanttChartView extends BasesView {
 
 				const mapperConfig = this.getTaskMapperConfig();
 				const updates: Record<string, string> = {};
+				const previous: Record<string, string> = {};
 
 				if (mapperConfig.startProperty) {
 					const propName = this.extractPropertyName(mapperConfig.startProperty);
+					previous[propName] = ganttTask.start;
 					updates[propName] = formatDateForFrontmatter(start);
 				}
 				if (mapperConfig.endProperty) {
 					const propName = this.extractPropertyName(mapperConfig.endProperty);
+					previous[propName] = ganttTask.end;
 					updates[propName] = formatDateForFrontmatter(end);
 				}
+
+				this.queueUndo(ganttTask.filePath, `Moved "${ganttTask.name}"`, previous);
 
 				// Write directly — no debounce. on_date_change fires once per
 				// bar on mouseup, and multiple bars fire synchronously when
@@ -387,6 +475,9 @@ export class GanttChartView extends BasesView {
 				const mapperConfig = this.getTaskMapperConfig();
 				if (mapperConfig.progressProperty) {
 					const propName = this.extractPropertyName(mapperConfig.progressProperty);
+					this.queueUndo(ganttTask.filePath, `Changed progress on "${ganttTask.name}"`, {
+						[propName]: ganttTask.progress ?? 0,
+					});
 					void this.writeFrontmatter(ganttTask.filePath, {
 						[propName]: Math.round(progress),
 					});
