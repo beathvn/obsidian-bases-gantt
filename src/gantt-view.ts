@@ -58,12 +58,20 @@ ganttProto.setup_dates = function (this: typeof ganttProto, refresh?: boolean): 
 interface UndoFileChange {
 	filePath: string;
 	previous: Record<string, string | number>;
+	/** Latest values actually written, to detect a drag that ended back where it started. */
+	next: Record<string, string | number>;
 }
 
 /** One undo-able user gesture (a single drag can touch several dependent tasks at once). */
 interface UndoBatch {
 	description: string;
 	changes: UndoFileChange[];
+}
+
+function recordsEqual(a: Record<string, string | number>, b: Record<string, string | number>): boolean {
+	const keys = Object.keys(a);
+	if (keys.length !== Object.keys(b).length) return false;
+	return keys.every((k) => a[k] === b[k]);
 }
 
 export class GanttChartView extends BasesView {
@@ -158,21 +166,27 @@ export class GanttChartView extends BasesView {
 		});
 	}
 
-	/** Queue a file's prior values for undo, batching calls from the same drag gesture. */
-	private queueUndo(filePath: string, description: string, previous: Record<string, string | number>): void {
+	/** Queue a file's prior/next values for undo, batching calls from the same drag gesture. */
+	private queueUndo(
+		filePath: string,
+		description: string,
+		previous: Record<string, string | number>,
+		next: Record<string, string | number>,
+	): void {
 		if (!this.pendingUndoBatch) {
 			this.pendingUndoBatch = { description, changes: [] };
 		}
-		// Keep only the first (pre-drag) "previous" per file: on_date_change
-		// re-fires on every day boundary crossed during a single drag, and
-		// undo should restore to before the drag started, not to the
-		// second-to-last day.
+		// Keep the first (pre-drag) "previous" per file but the latest "next":
+		// on_date_change re-fires on every day boundary crossed during a
+		// single drag, and undo should restore to before the drag started,
+		// not to the second-to-last day.
 		const existing = this.pendingUndoBatch.changes.find((c) => c.filePath === filePath);
 		if (existing) {
-			// New call's values win only for keys not already recorded.
+			// New call's previous values win only for keys not already recorded.
 			existing.previous = { ...previous, ...existing.previous };
+			existing.next = next;
 		} else {
-			this.pendingUndoBatch.changes.push({ filePath, previous });
+			this.pendingUndoBatch.changes.push({ filePath, previous, next });
 		}
 
 		if (this.undoFlushTimer !== null) {
@@ -187,7 +201,12 @@ export class GanttChartView extends BasesView {
 	private flushUndoBatch(): void {
 		const batch = this.pendingUndoBatch;
 		this.pendingUndoBatch = null;
-		if (!batch || batch.changes.length === 0) return;
+		if (!batch) return;
+
+		// Drop no-op changes — e.g. the bar was dragged out and back to
+		// exactly where it started before the mouse was released.
+		batch.changes = batch.changes.filter((c) => !recordsEqual(c.previous, c.next));
+		if (batch.changes.length === 0) return;
 
 		this.undoStack.push(batch);
 		if (this.undoStack.length > GanttChartView.MAX_UNDO_ENTRIES) {
@@ -479,12 +498,13 @@ export class GanttChartView extends BasesView {
 					updates[propName] = formatDateForFrontmatter(end);
 				}
 
-				this.queueUndo(ganttTask.filePath, `Moved "${ganttTask.name}"`, previous);
+				this.queueUndo(ganttTask.filePath, `Moved "${ganttTask.name}"`, previous, updates);
 
-				// Write directly — no debounce. on_date_change fires once per
-				// bar on mouseup, and multiple bars fire synchronously when
-				// move_dependencies is true. A shared debounce would drop all
-				// but the last bar's update.
+				// Write directly — no debounce. on_date_change fires on every
+				// mousemove tick that crosses a day boundary (and multiple
+				// bars fire synchronously when move_dependencies is true), so
+				// this keeps writing the latest value each time; a shared
+				// debounce would drop all but the last bar's update.
 				void this.writeFrontmatter(ganttTask.filePath, updates);
 			},
 
@@ -496,11 +516,15 @@ export class GanttChartView extends BasesView {
 				const mapperConfig = this.getTaskMapperConfig();
 				if (mapperConfig.progressProperty) {
 					const propName = this.extractPropertyName(mapperConfig.progressProperty);
-					this.queueUndo(ganttTask.filePath, `Changed progress on "${ganttTask.name}"`, {
-						[propName]: ganttTask.progress ?? 0,
-					});
+					const rounded = Math.round(progress);
+					this.queueUndo(
+						ganttTask.filePath,
+						`Changed progress on "${ganttTask.name}"`,
+						{ [propName]: ganttTask.progress ?? 0 },
+						{ [propName]: rounded },
+					);
 					void this.writeFrontmatter(ganttTask.filePath, {
-						[propName]: Math.round(progress),
+						[propName]: rounded,
 					});
 				}
 			},
