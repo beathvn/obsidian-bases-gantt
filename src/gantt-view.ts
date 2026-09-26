@@ -299,8 +299,18 @@ export class GanttChartView extends BasesView {
 		if (emptyEl) emptyEl.remove();
 
 		if (this.gantt && this.configSnapshot === newSnapshot) {
-			// Only data changed, not config — refresh in place
+			// Only data changed, not config — refresh in place.
+			// Frappe's refresh() re-renders via change_view_mode() with no
+			// "maintain_pos", which jumps scrollLeft back to the chart's
+			// original scroll_to (earliest task / today). Since a drag
+			// writes frontmatter live (on every day boundary crossed, not
+			// just on mouseup), that write round-trips through Obsidian's
+			// metadata cache back into onDataUpdated mid-drag and yanks the
+			// view out from under the user's mouse. Save and restore
+			// scrollLeft around the refresh so it never visibly moves.
+			const scrollLeft = this.gantt.$container.scrollLeft;
 			this.gantt.refresh(tasks);
+			this.gantt.$container.scrollLeft = scrollLeft;
 		} else {
 			// Config changed or first render — recreate
 			this.configSnapshot = newSnapshot;
