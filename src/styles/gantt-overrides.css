@@ -139,6 +139,40 @@
 	stroke: var(--color-pink);
 }
 
+/* Progress fill: a darker shade of the bar's own "Color by" hue instead of
+   a fixed accent color, so it reads as part of the same bar. */
+.bases-gantt-view .gantt .gantt-color-0 .bar-progress {
+	fill: color-mix(in oklch, var(--interactive-accent) 65%, black);
+}
+
+.bases-gantt-view .gantt .gantt-color-1 .bar-progress {
+	fill: color-mix(in oklch, var(--color-green) 65%, black);
+}
+
+.bases-gantt-view .gantt .gantt-color-2 .bar-progress {
+	fill: color-mix(in oklch, var(--color-orange) 65%, black);
+}
+
+.bases-gantt-view .gantt .gantt-color-3 .bar-progress {
+	fill: color-mix(in oklch, var(--color-red) 65%, black);
+}
+
+.bases-gantt-view .gantt .gantt-color-4 .bar-progress {
+	fill: color-mix(in oklch, var(--color-purple) 65%, black);
+}
+
+.bases-gantt-view .gantt .gantt-color-5 .bar-progress {
+	fill: color-mix(in oklch, var(--color-yellow) 65%, black);
+}
+
+.bases-gantt-view .gantt .gantt-color-6 .bar-progress {
+	fill: color-mix(in oklch, var(--color-cyan) 65%, black);
+}
+
+.bases-gantt-view .gantt .gantt-color-7 .bar-progress {
+	fill: color-mix(in oklch, var(--color-pink) 65%, black);
+}
+
 /* ── Group header rows ───────────────────────────────────────────── */
 
 .bases-gantt-view .gantt .gantt-group-header .bar {
