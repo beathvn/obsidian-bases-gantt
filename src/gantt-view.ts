@@ -87,29 +87,25 @@ export class GanttChartView extends BasesView {
 	private currentTasks: GanttTask[] = [];
 	private taskMap: Map<string, GanttTask> = new Map();
 	/**
-	 * True from the first on_date_change of a drag until
-	 * ~500ms after the last one. While true, onDataUpdated skips rebuilding
-	 * the task list — the live per-tick writes a drag produces would
-	 * otherwise re-sort rows and reset scroll position under the user's
-	 * mouse while they're still dragging.
+	 * True from the first on_date_change of a drag until just after the
+	 * mouseup that ends it. While true, onDataUpdated skips rebuilding the
+	 * chart (which would re-sort rows and reset scroll under the user's
+	 * mouse) and on_click ignores the click Frappe dispatches on release.
 	 */
 	private isDragging = false;
+	/** onDataUpdated was skipped during a drag and must re-run once it ends. */
+	private skippedDataUpdate = false;
 	/** Global mouseup handlers Frappe Gantt registers on document (for cleanup). */
 	private capturedGlobalHandlers: EventListener[] = [];
 	/** Recent drag-caused frontmatter writes, most recent last. */
 	private undoStack: UndoBatch[] = [];
 	private static readonly MAX_UNDO_ENTRIES = 20;
 	/**
-	 * Batches on_date_change calls into one undo step per
-	 * drag gesture. Frappe Gantt fires on_date_change on every mousemove tick
-	 * that crosses a day boundary (not just once at mouseup), so this is
-	 * debounced rather than flushed on the next microtask — otherwise a
-	 * single drag across several days would queue a separate undo entry (and
-	 * Notice) per day.
+	 * Date changes of the drag in progress, keyed per file. Frappe fires
+	 * on_date_change on every day boundary crossed (not once at release),
+	 * so changes are collected here and only written on mouseup.
 	 */
-	private pendingUndoBatch: UndoBatch | null = null;
-	private undoFlushTimer: number | null = null;
-	private static readonly UNDO_BATCH_DEBOUNCE_MS = 500;
+	private pendingDrag: UndoBatch | null = null;
 
 	constructor(controller: QueryController, containerEl: HTMLElement) {
 		super(controller);
@@ -121,6 +117,9 @@ export class GanttChartView extends BasesView {
 		this.containerEl.addClass('bases-gantt-view');
 		this.ganttEl = this.containerEl.createDiv({ cls: 'gantt-wrapper' });
 		this.registerContextMenu();
+		// Bubble phase on document, so Frappe's own mouseup handler on the
+		// SVG (which fires the final on_date_change) has already run.
+		this.registerDomEvent(document, 'mouseup', () => this.finishDrag());
 	}
 
 	onunload(): void {
@@ -137,12 +136,9 @@ export class GanttChartView extends BasesView {
 		this.currentTasks = [];
 		this.taskMap.clear();
 		this.undoStack = [];
-		this.pendingUndoBatch = null;
+		this.pendingDrag = null;
 		this.isDragging = false;
-		if (this.undoFlushTimer !== null) {
-			window.clearTimeout(this.undoFlushTimer);
-			this.undoFlushTimer = null;
-		}
+		this.skippedDataUpdate = false;
 	}
 
 	onResize(): void {
@@ -173,54 +169,51 @@ export class GanttChartView extends BasesView {
 		});
 	}
 
-	/** Queue a file's prior/next values for undo, batching calls from the same drag gesture. */
-	private queueUndo(
+	/** Record a file's pre-drag and current values for the drag in progress. */
+	private recordDragChange(
 		filePath: string,
 		description: string,
 		previous: Record<string, string | number>,
 		next: Record<string, string | number>,
 	): void {
 		this.isDragging = true;
-		if (!this.pendingUndoBatch) {
-			this.pendingUndoBatch = { description, changes: [] };
+		if (!this.pendingDrag) {
+			this.pendingDrag = { description, changes: [] };
 		}
-		// Keep the first (pre-drag) "previous" per file but the latest "next":
-		// on_date_change re-fires on every day boundary crossed during a
-		// single drag, and undo should restore to before the drag started,
-		// not to the second-to-last day.
-		const existing = this.pendingUndoBatch.changes.find((c) => c.filePath === filePath);
+		// Keep the first (pre-drag) "previous" per file but the latest "next".
+		const existing = this.pendingDrag.changes.find((c) => c.filePath === filePath);
 		if (existing) {
-			// New call's previous values win only for keys not already recorded.
 			existing.previous = { ...previous, ...existing.previous };
 			existing.next = next;
 		} else {
-			this.pendingUndoBatch.changes.push({ filePath, previous, next });
+			this.pendingDrag.changes.push({ filePath, previous, next });
 		}
-
-		if (this.undoFlushTimer !== null) {
-			window.clearTimeout(this.undoFlushTimer);
-		}
-		this.undoFlushTimer = window.setTimeout(() => {
-			this.undoFlushTimer = null;
-			this.flushUndoBatch();
-		}, GanttChartView.UNDO_BATCH_DEBOUNCE_MS);
 	}
 
-	private flushUndoBatch(): void {
-		this.isDragging = false;
-		const batch = this.pendingUndoBatch;
-		this.pendingUndoBatch = null;
-
-		// Row order/positions weren't rebuilt during the drag (see
-		// onDataUpdated); catch up now that it's over.
-		this.onDataUpdated();
-
+	/** On mouseup: write the drag's final dates once, then offer undo. */
+	private finishDrag(): void {
+		const batch = this.pendingDrag;
 		if (!batch) return;
+		this.pendingDrag = null;
+
+		// Frappe dispatches a click on the bar right after this mouseup, in
+		// the same task — keep isDragging set until it's been ignored.
+		window.setTimeout(() => {
+			this.isDragging = false;
+			if (this.skippedDataUpdate) {
+				this.skippedDataUpdate = false;
+				this.onDataUpdated();
+			}
+		}, 0);
 
 		// Drop no-op changes — e.g. the bar was dragged out and back to
 		// exactly where it started before the mouse was released.
 		batch.changes = batch.changes.filter((c) => !recordsEqual(c.previous, c.next));
 		if (batch.changes.length === 0) return;
+
+		for (const change of batch.changes) {
+			void this.writeFrontmatter(change.filePath, change.next);
+		}
 
 		this.undoStack.push(batch);
 		if (this.undoStack.length > GanttChartView.MAX_UNDO_ENTRIES) {
@@ -276,12 +269,12 @@ export class GanttChartView extends BasesView {
 
 	onDataUpdated(): void {
 		if (!this.data?.data || !this.ganttEl) return;
-		// A drag writes frontmatter live (per day boundary crossed, not just
-		// on mouseup), which round-trips back here mid-drag. Rebuilding the
-		// task list now would re-sort rows and jump the scroll position
-		// under the user's mouse; flushUndoBatch() re-runs this once the
-		// drag actually ends instead.
-		if (this.isDragging) return;
+		// Rebuilding mid-drag would re-sort rows and jump the scroll position
+		// under the user's mouse; finishDrag() re-runs this once it ends.
+		if (this.isDragging) {
+			this.skippedDataUpdate = true;
+			return;
+		}
 
 		const config = this.getTaskMapperConfig();
 		const newSnapshot = JSON.stringify(config) + '|' + this.getDisplayConfigSnapshot();
@@ -322,12 +315,9 @@ export class GanttChartView extends BasesView {
 			// Only data changed, not config — refresh in place.
 			// Frappe's refresh() re-renders via change_view_mode() with no
 			// "maintain_pos", which jumps scrollLeft back to the chart's
-			// original scroll_to (earliest task / today). Since a drag
-			// writes frontmatter live (on every day boundary crossed, not
-			// just on mouseup), that write round-trips through Obsidian's
-			// metadata cache back into onDataUpdated mid-drag and yanks the
-			// view out from under the user's mouse. Save and restore
-			// scrollLeft around the refresh so it never visibly moves.
+			// original scroll_to (earliest task / today) — e.g. right after
+			// every drag's write. Save and restore scrollLeft around the
+			// refresh so it never visibly moves.
 			const scrollLeft = this.gantt.$container.scrollLeft;
 			this.gantt.refresh(tasks);
 			this.gantt.$container.scrollLeft = scrollLeft;
@@ -499,8 +489,8 @@ export class GanttChartView extends BasesView {
 				// with no drag-awareness of its own, so a drag or resize that
 				// ends with the mouse over the bar would otherwise also open
 				// the note. isDragging spans the whole gesture (see
-				// queueUndo/flushUndoBatch), so it's still true for the click
-				// that immediately follows a drag-ending mouseup.
+				// recordDragChange/finishDrag), so it's still true for the
+				// click that immediately follows a drag-ending mouseup.
 				if (this.isDragging) return;
 				// Ignore group header phantom tasks
 				if (task.id.startsWith(GROUP_HEADER_PREFIX)) return;
@@ -530,14 +520,8 @@ export class GanttChartView extends BasesView {
 					updates[propName] = formatDateForFrontmatter(end);
 				}
 
-				this.queueUndo(ganttTask.filePath, `Moved "${ganttTask.name}"`, previous, updates);
-
-				// Write directly — no debounce. on_date_change fires on every
-				// mousemove tick that crosses a day boundary (and multiple
-				// bars fire synchronously when move_dependencies is true), so
-				// this keeps writing the latest value each time; a shared
-				// debounce would drop all but the last bar's update.
-				void this.writeFrontmatter(ganttTask.filePath, updates);
+				// Written once on mouseup by finishDrag(), not per tick.
+				this.recordDragChange(ganttTask.filePath, `Moved "${ganttTask.name}"`, previous, updates);
 			},
 
 			on_date_click: (dateStr: string) => {
