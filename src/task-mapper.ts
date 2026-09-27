@@ -237,8 +237,7 @@ export function mapEntriesToTasks(
 }
 
 /**
- * Topological sort: tasks with no dependencies first, then tasks whose
- * dependencies are already placed. Ties broken by start date.
+ * Start-date order, adjusted so every task comes after its dependencies.
  * This ensures dependency arrows always point downward in the chart.
  */
 function sortByDependencies(tasks: GanttTask[]): GanttTask[] {
@@ -264,16 +263,19 @@ function sortByDependencies(tasks: GanttTask[]): GanttTask[] {
 	const placed = new Set<string>();
 	const remaining = new Set(tasks.map(t => t.id));
 
-	// Repeatedly pick tasks whose dependencies are all placed
+	// Place one task at a time: the earliest-starting task whose dependencies
+	// are all placed. This keeps plain start-date order and only pushes a task
+	// down when it would otherwise sit above one of its prerequisites.
 	while (remaining.size > 0) {
-		const ready: GanttTask[] = [];
+		let next: GanttTask | null = null;
 		for (const id of remaining) {
 			const deps = depsOf.get(id)!;
-			const allMet = [...deps].every(d => placed.has(d));
-			if (allMet) ready.push(taskMap.get(id)!);
+			if (![...deps].every(d => placed.has(d))) continue;
+			const t = taskMap.get(id)!;
+			if (!next || t.start.localeCompare(next.start) < 0) next = t;
 		}
 
-		if (ready.length === 0) {
+		if (!next) {
 			// Circular dependency — just append the rest by start date
 			const rest = [...remaining].map(id => taskMap.get(id)!);
 			rest.sort((a, b) => a.start.localeCompare(b.start));
@@ -281,13 +283,9 @@ function sortByDependencies(tasks: GanttTask[]): GanttTask[] {
 			break;
 		}
 
-		// Sort ready tasks by start date
-		ready.sort((a, b) => a.start.localeCompare(b.start));
-		for (const t of ready) {
-			sorted.push(t);
-			placed.add(t.id);
-			remaining.delete(t.id);
-		}
+		sorted.push(next);
+		placed.add(next.id);
+		remaining.delete(next.id);
 	}
 
 	return sorted;
