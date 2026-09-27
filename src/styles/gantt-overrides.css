@@ -88,6 +88,13 @@
 	font-weight: 700;
 }
 
+/* The today line is an HTML div layered above the chart's SVG, so without
+   this it swallows mousedown/mousemove on any bar that crosses today. */
+.bases-gantt-view .gantt-container .current-highlight,
+.bases-gantt-view .gantt-container .current-ball-highlight {
+	pointer-events: none;
+}
+
 /* ── Expected progress line ──────────────────────────────────────── */
 
 .bases-gantt-view .gantt .bar-expected-progress {
