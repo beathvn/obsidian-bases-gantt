@@ -16,6 +16,29 @@ import { mapEntriesToTasks, createGroupHeaderTask, GROUP_HEADER_PREFIX, type Gan
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
 import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, drawQuarterBackdrop, withCachedDateFormats } from './zoom';
 
+// ── Drag moves the whole dependency chain ──
+// Frappe's get_all_dependent_tasks marks each level as seen before filtering
+// the next one to process, so it stops after direct dependents: dragging a
+// task moves its children but not its grandchildren. Walk the full chain.
+const ganttDeps = Gantt.prototype as unknown as {
+	dependency_map: Record<string, string[] | undefined>;
+	get_all_dependent_tasks(taskId: string): string[];
+};
+ganttDeps.get_all_dependent_tasks = function (this: typeof ganttDeps, taskId: string): string[] {
+	const seen = new Set<string>([taskId]);
+	const queue = [taskId];
+	while (queue.length) {
+		for (const child of this.dependency_map[queue.shift()!] ?? []) {
+			if (!seen.has(child)) {
+				seen.add(child);
+				queue.push(child);
+			}
+		}
+	}
+	seen.delete(taskId);
+	return [...seen];
+};
+
 // ── Bar drag → dates: convert the drag distance in whole days ──
 // Frappe maps a bar's absolute x/width back to dates via
 // date_utils.add(gantt_start, x/column_width*step, unit), which parseInt()s
