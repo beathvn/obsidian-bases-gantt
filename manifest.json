@@ -1,7 +1,7 @@
 {
-	"id": "bases-gantt",
-	"name": "Bases Gantt",
-	"version": "1.0.0",
+	"id": "bases-gantt-beathvn",
+	"name": "Bases Gantt (beathvn fork)",
+	"version": "1.1.0",
 	"minAppVersion": "1.10.0",
 	"description": "Gantt chart / timeline view for Bases. Visualize tasks with start and end dates, dependencies, and progress.",
 	"author": "lhassa8",

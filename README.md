@@ -308,7 +308,7 @@ This can happen if date values include timezone information. Use the plain `YYYY
 ### Manual
 
 1. Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/lhassa8/obsidian-bases-gantt/releases/latest)
-2. Create a folder called `bases-gantt` inside your vault's `.obsidian/plugins/` directory
+2. Create a folder called `bases-gantt-beathvn` inside your vault's `.obsidian/plugins/` directory
 3. Place the three files in that folder
 4. Enable the plugin in **Settings > Community plugins**
 

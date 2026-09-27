@@ -6,7 +6,7 @@ import path from "path";
 const prod = process.argv[2] === "production";
 
 // Optional: set OBSIDIAN_VAULT_PLUGIN_DIR to your vault's plugin folder
-// (e.g. ".../playground/.obsidian/plugins/bases-gantt") to have builds
+// (e.g. ".../playground/.obsidian/plugins/bases-gantt-beathvn") to have builds
 // write main.js/styles.css directly there instead of the repo root.
 const outDir = process.env.OBSIDIAN_VAULT_PLUGIN_DIR || ".";
 
