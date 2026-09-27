@@ -135,6 +135,8 @@ interface FrappeInternals {
 	config: { column_width: number; step: number; unit: string; header_height: number; view_mode?: { name?: string } };
 	options: { column_width?: number | null; holidays?: Record<string, string> | null };
 	$container: HTMLElement;
+	/** Set once the user asks for today, so later re-renders keep it in range. */
+	include_today?: boolean;
 	change_view_mode(mode?: string, maintain_pos?: boolean): void;
 	hide_popup(): void;
 	set_scroll_position(date: unknown): void;
@@ -170,6 +172,10 @@ ganttProto.setup_dates = function (this: FrappeInternals, refresh?: boolean): vo
 		if (this.tasks.length) {
 			first = Math.min(...this.tasks.map((t) => t._start.getTime()));
 			last = Math.max(...this.tasks.map((t) => t._end.getTime()));
+		}
+		if (this.include_today) {
+			first = Math.min(first, Date.now());
+			last = Math.max(last, Date.now());
 		}
 		const start = startOfUnit(new Date(first - padMs), unit);
 		if (start < this.gantt_start) this.gantt_start = start;
@@ -340,12 +346,17 @@ function wheelZoomFactor(evt: WheelEvent): number {
 	return Math.pow(2, -Math.max(-50, Math.min(50, dy)) * 0.01);
 }
 
+function touchDistance(touches: TouchList): number {
+	return Math.max(1, Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY));
+}
+
 export class ZoomController {
 	pxPerDay: number;
 	private readonly viewModes: FrappeViewMode[];
 	private pending: { pxPerDay: number; anchor: Date; anchorX: number } | null = null;
 	private frame = 0;
 	private settleTimer = 0;
+	private pinch: { distance: number; targets: EventTarget[] } | null = null;
 	private static readonly SETTLE_MS = 400;
 
 	constructor(
@@ -386,6 +397,47 @@ export class ZoomController {
 		this.zoomBy(wheelZoomFactor(evt), evt.clientX - rect.left);
 	}
 
+	/** Two-finger pinch on a touchscreen, which (unlike a trackpad pinch) fires no wheel events. */
+	handleTouchStart(evt: TouchEvent): void {
+		if (evt.touches.length !== 2 || !this.getGantt()) return;
+		this.endPinch();
+		// Each zoom re-render replaces the SVG elements under the fingers, and touch events keep
+		// going to their now-detached start targets without bubbling, so listen on those directly.
+		const targets = [...new Set(Array.from(evt.touches, (t) => t.target))];
+		for (const t of targets) {
+			t.addEventListener('touchmove', this.onPinchMove, { passive: false });
+			t.addEventListener('touchend', this.onPinchEnd);
+			t.addEventListener('touchcancel', this.onPinchEnd);
+		}
+		this.pinch = { distance: touchDistance(evt.touches), targets };
+	}
+
+	private readonly onPinchMove = (evt: Event): void => {
+		const touches = (evt as TouchEvent).touches;
+		const gantt = this.getGantt();
+		if (!this.pinch || !gantt || touches.length !== 2) return;
+		evt.preventDefault();
+		const distance = touchDistance(touches);
+		const rect = gantt.$container.getBoundingClientRect();
+		const midX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left;
+		this.zoomBy(distance / this.pinch.distance, midX);
+		this.pinch.distance = distance;
+	};
+
+	private readonly onPinchEnd = (evt: Event): void => {
+		if ((evt as TouchEvent).touches.length < 2) this.endPinch();
+	};
+
+	private endPinch(): void {
+		if (!this.pinch) return;
+		for (const t of this.pinch.targets) {
+			t.removeEventListener('touchmove', this.onPinchMove);
+			t.removeEventListener('touchend', this.onPinchEnd);
+			t.removeEventListener('touchcancel', this.onPinchEnd);
+		}
+		this.pinch = null;
+	}
+
 	/** Zoom by a factor, keeping the date at anchorX (container px, default: center) in place. */
 	zoomBy(factor: number, anchorX?: number): void {
 		const base = this.pending?.pxPerDay ?? this.pxPerDay;
@@ -411,6 +463,29 @@ export class ZoomController {
 	}
 
 	/**
+	 * Scroll today's column to the left edge, as Frappe's scroll_current does.
+	 * That one can't be used: it re-parses today from a string like
+	 * "2026-09-27 ", which WebKit (Obsidian on iOS) rejects as an Invalid Date,
+	 * sending the chart to its first column. It also does nothing when today is
+	 * outside the grid's date range, so widen the range to include it first.
+	 */
+	scrollToToday(): void {
+		const gantt = this.getGantt();
+		if (!gantt) return;
+		const g = internals(gantt);
+		const now = new Date();
+		if (now < g.gantt_start || now > g.gantt_end) {
+			g.include_today = true;
+			g.hide_popup();
+			this.renderAnchored(g, () => g.change_view_mode(bandFor(this.pxPerDay).mode), now, 0);
+			this.onRendered();
+		}
+		const { column_width } = g.config;
+		const columnStart = Math.floor(xForDate(g, now) / column_width) * column_width;
+		g.$container.scrollTo({ left: columnStart - column_width / 6, behavior: 'smooth' });
+	}
+
+	/**
 	 * Run a Frappe re-render (e.g. refresh with new tasks) without the view
 	 * jumping: the date at the left edge stays at the left edge.
 	 */
@@ -424,6 +499,7 @@ export class ZoomController {
 	destroy(): void {
 		cancelAnimationFrame(this.frame);
 		window.clearTimeout(this.settleTimer);
+		this.endPinch();
 		this.frame = 0;
 		this.pending = null;
 	}

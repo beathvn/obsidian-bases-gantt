@@ -181,6 +181,13 @@ export class GanttChartView extends BasesView {
 		);
 		// Non-passive so a pinch / Ctrl+wheel can be kept from scrolling.
 		this.registerDomEvent(this.ganttEl, 'wheel', (evt) => this.zoom.handleWheel(evt), { passive: false });
+		this.registerDomEvent(this.ganttEl, 'touchstart', (evt) => this.zoom.handleTouchStart(evt), { passive: true });
+		// Capture phase, so this replaces the handler Frappe puts on its Today button.
+		this.registerDomEvent(this.ganttEl, 'click', (evt) => {
+			if (!(evt.target as Element).closest('.today-button')) return;
+			evt.stopPropagation();
+			this.scrollToToday();
+		}, true);
 		this.registerDomEvent(this.ganttEl, 'mousedown', (evt) => {
 			this.mouseDownPos = { x: evt.clientX, y: evt.clientY };
 		}, true);
@@ -228,7 +235,7 @@ export class GanttChartView extends BasesView {
 
 	/** Public: scroll chart to today (for command palette). */
 	scrollToToday(): void {
-		this.gantt?.scroll_current();
+		this.zoom.scrollToToday();
 	}
 
 	/** Public: revert the most recent drag-caused frontmatter change (for command palette). */
