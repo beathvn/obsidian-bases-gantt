@@ -87,7 +87,7 @@ export class GanttChartView extends BasesView {
 	private currentTasks: GanttTask[] = [];
 	private taskMap: Map<string, GanttTask> = new Map();
 	/**
-	 * True from the first on_date_change/on_progress_change of a drag until
+	 * True from the first on_date_change of a drag until
 	 * ~500ms after the last one. While true, onDataUpdated skips rebuilding
 	 * the task list — the live per-tick writes a drag produces would
 	 * otherwise re-sort rows and reset scroll position under the user's
@@ -100,7 +100,7 @@ export class GanttChartView extends BasesView {
 	private undoStack: UndoBatch[] = [];
 	private static readonly MAX_UNDO_ENTRIES = 20;
 	/**
-	 * Batches on_date_change/on_progress_change calls into one undo step per
+	 * Batches on_date_change calls into one undo step per
 	 * drag gesture. Frappe Gantt fires on_date_change on every mousemove tick
 	 * that crosses a day boundary (not just once at mouseup), so this is
 	 * debounced rather than flushed on the next microtask — otherwise a
@@ -477,7 +477,7 @@ export class GanttChartView extends BasesView {
 			scroll_to: earliestDate || 'today',
 			readonly: false,
 			readonly_dates: false,
-			readonly_progress: !showProgress,
+			readonly_progress: true,
 			infinite_padding: false,
 			view_mode_select: false,
 
@@ -538,27 +538,6 @@ export class GanttChartView extends BasesView {
 				// this keeps writing the latest value each time; a shared
 				// debounce would drop all but the last bar's update.
 				void this.writeFrontmatter(ganttTask.filePath, updates);
-			},
-
-			on_progress_change: (task, progress) => {
-				if (!showProgress) return;
-				const ganttTask = this.findTask(task.id);
-				if (!ganttTask) return;
-
-				const mapperConfig = this.getTaskMapperConfig();
-				if (mapperConfig.progressProperty) {
-					const propName = this.extractPropertyName(mapperConfig.progressProperty);
-					const rounded = Math.round(progress);
-					this.queueUndo(
-						ganttTask.filePath,
-						`Changed progress on "${ganttTask.name}"`,
-						{ [propName]: ganttTask.progress ?? 0 },
-						{ [propName]: rounded },
-					);
-					void this.writeFrontmatter(ganttTask.filePath, {
-						[propName]: rounded,
-					});
-				}
 			},
 
 			on_date_click: (dateStr: string) => {
@@ -744,28 +723,6 @@ export class GanttChartView extends BasesView {
 		});
 
 		menu.addSeparator();
-
-		const showProgress = (this.config.get('showProgress') as boolean) ?? false;
-		if (showProgress) {
-			for (const pct of [0, 25, 50, 75, 100]) {
-				menu.addItem((item) => {
-					item.setTitle(`Set progress: ${pct}%`)
-						.setChecked(Math.round(task.progress ?? 0) === pct)
-						.onClick(() => {
-							const mapperConfig = this.getTaskMapperConfig();
-							if (mapperConfig.progressProperty) {
-								const propName = this.extractPropertyName(mapperConfig.progressProperty);
-								void this.writeFrontmatter(task.filePath, {
-									[propName]: pct,
-								});
-								// Instant visual feedback
-								this.gantt?.update_task(task.id, { progress: pct });
-							}
-						});
-				});
-			}
-			menu.addSeparator();
-		}
 
 		menu.addItem((item) => {
 			item.setTitle('Scroll to today')
