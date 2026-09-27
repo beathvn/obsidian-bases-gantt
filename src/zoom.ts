@@ -272,6 +272,32 @@ export function drawQuarterBackdrop(gantt: Gantt): void {
 	}
 }
 
+/**
+ * Whole days to shift a bar starting on `start` so that Frappe draws it
+ * as close as possible to where it was moved by `dx` pixels. In Month and
+ * Year zoom Frappe's mapping follows the calendar (day D of a month sits at
+ * D/31 of its column, leaving small gaps at month ends), so this is not
+ * simply dx / px-per-day: the nearest few days are tried against it.
+ */
+export function dayShiftForX(gantt: Gantt, start: Date, dx: number): number {
+	const g = internals(gantt);
+	const from = xForDate(g, start);
+	const target = from + dx;
+	const estimate = Math.round((dateForX(g, target).getTime() - dateForX(g, from).getTime()) / DAY_MS);
+	let best = estimate;
+	let bestError = Infinity;
+	for (const offset of [0, -1, 1, -2, 2, -3, 3]) {
+		const d = new Date(start);
+		d.setDate(d.getDate() + estimate + offset);
+		const error = Math.abs(xForDate(g, d) - target);
+		if (error < bestError - 0.01) {
+			best = estimate + offset;
+			bestError = error;
+		}
+	}
+	return best;
+}
+
 // ── Render speed ──
 
 /**

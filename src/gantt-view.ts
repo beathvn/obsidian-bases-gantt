@@ -14,25 +14,26 @@ import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
-import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, drawQuarterBackdrop, withCachedDateFormats } from './zoom';
+import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, drawQuarterBackdrop, withCachedDateFormats } from './zoom';
 
 // ── Bar drag → dates: convert the drag distance in whole days ──
 // Frappe maps a bar's absolute x/width back to dates via
 // date_utils.add(gantt_start, x/column_width*step, unit), which parseInt()s
 // the count. That truncates float noise in Week view (Saturday → Friday)
 // and, in Month/Year view, whole months/years: every drag snaps the start
-// to the 1st and collapses short tasks. Its date→x mapping also differs
-// from its width math there, so an exact inverse isn't possible. Instead,
-// convert how far each edge moved since mousedown into days (using the
-// same days-per-unit Frappe uses for widths and snapping) and shift the
-// original dates by that — exact in every view, and a move keeps the
-// task's length. Bar isn't exported, so its prototype is patched from the
-// first rendered bar.
+// to the 1st and collapses short tasks. Instead, shift the pre-drag dates
+// by how far each edge moved, in whole days. Frappe positions a bar's start
+// with a calendar mapping (day D of a month at D/31 of its column) but sizes
+// it with 30-day months, so the start shift follows the mapping and a
+// resized end follows the width math; that way the redrawn bar lands where
+// it was released in every view. An edge that didn't move keeps its date,
+// and a move keeps the task's length. Bar isn't exported, so its prototype
+// is patched from the first rendered bar.
 interface FrappeBar {
 	/** ox/owidth are set by Frappe on mousedown, before any date is computed. */
 	$bar: { getX(): number; getWidth(): number; ox?: number; owidth?: number };
 	task: { _start: Date; _end: Date };
-	gantt: { config: { column_width: number; step: number; unit: string } };
+	gantt: Gantt & { config: { column_width: number; step: number; unit: string } };
 	dragOrigin?: { ox: number; owidth: number; start: Date; end: Date };
 }
 
@@ -63,8 +64,12 @@ function patchBarDateMath(gantt: Gantt): void {
 		}
 		const { column_width, step, unit } = this.gantt.config;
 		const pxPerDay = column_width / (step * DAYS_PER_UNIT[unit]);
-		const startShift = Math.round((bar.getX() - ox) / pxPerDay);
-		const endShift = Math.round((bar.getX() + bar.getWidth() - ox - owidth) / pxPerDay);
+		const x = bar.getX();
+		const width = bar.getWidth();
+		const startMoved = Math.abs(x - ox) > 0.5;
+		const endMoved = Math.abs(x + width - ox - owidth) > 0.5;
+		const startShift = startMoved ? dayShiftForX(this.gantt, this.dragOrigin.start, x - ox) : 0;
+		const endShift = endMoved ? startShift + Math.round((width - owidth) / pxPerDay) : 0;
 		return {
 			new_start_date: addDays(this.dragOrigin.start, startShift),
 			new_end_date: addDays(this.dragOrigin.end, endShift),
@@ -519,6 +524,9 @@ export class GanttChartView extends BasesView {
 			readonly: false,
 			readonly_dates: false,
 			readonly_progress: true,
+			// Drag in whole days at every zoom (Frappe's Month and Year modes
+			// otherwise snap to 7- and 30-day steps).
+			snap_at: '1d',
 			infinite_padding: false,
 			view_mode_select: false,
 
