@@ -5,6 +5,12 @@ import path from "path";
 
 const prod = process.argv[2] === "production";
 
+// Optional: set OBSIDIAN_VAULT_PLUGIN_DIR to your vault's plugin folder
+// (e.g. ".../playground/.obsidian/plugins/bases-gantt") to have builds
+// write main.js/styles.css directly there instead of the repo root.
+const outDir = process.env.OBSIDIAN_VAULT_PLUGIN_DIR || ".";
+
+
 // Plugin to handle CSS imports in JS by replacing them with empty modules
 const cssImportPlugin = {
 	name: "css-import",
@@ -28,7 +34,7 @@ const jsContext = await esbuild.context({
 	logLevel: "info",
 	sourcemap: prod ? false : "inline",
 	treeShaking: true,
-	outfile: "main.js",
+	outfile: path.join(outDir, "main.js"),
 	minify: prod,
 	plugins: [cssImportPlugin],
 });
@@ -38,7 +44,7 @@ const cssContext = await esbuild.context({
 	entryPoints: ["src/styles/main.css"],
 	bundle: true,
 	logLevel: "info",
-	outfile: "styles.css",
+	outfile: path.join(outDir, "styles.css"),
 	minify: prod,
 });
 
