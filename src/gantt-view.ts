@@ -54,6 +54,54 @@ ganttProto.setup_dates = function (this: typeof ganttProto, refresh?: boolean): 
 	this.setup_date_values();
 };
 
+// ── Bar pixel→date conversion: fix off-by-one from float truncation ──
+// Frappe converts a bar's x/width to dates via date_utils.add(), which
+// parseInt()s the unit count. In Week view one day is column_width/7 px, so
+// x/column_width*7 comes out like 4.9999999 for some days (e.g. Saturday)
+// and truncates to the day before. Snap near-integers before adding. Bar
+// isn't exported, so its prototype is patched from the first rendered bar.
+interface FrappeBar {
+	$bar: { getX(): number; getWidth(): number };
+	gantt: { gantt_start: Date; config: { column_width: number; step: number; unit: string } };
+}
+
+function snapUnits(n: number): number {
+	const rounded = Math.round(n);
+	return Math.abs(n - rounded) < 1e-6 ? rounded : n;
+}
+
+function addUnits(date: Date, qty: number, unit: string): Date {
+	const q = Math.trunc(qty);
+	return new Date(
+		date.getFullYear() + (unit === 'year' ? q : 0),
+		date.getMonth() + (unit === 'month' ? q : 0),
+		date.getDate() + (unit === 'day' ? q : 0),
+		date.getHours() + (unit === 'hour' ? q : 0),
+		date.getMinutes() + (unit === 'minute' ? q : 0),
+		date.getSeconds() + (unit === 'second' ? q : 0),
+		date.getMilliseconds() + (unit === 'millisecond' ? q : 0),
+	);
+}
+
+let barDateMathPatched = false;
+function patchBarDateMath(gantt: Gantt): void {
+	if (barDateMathPatched) return;
+	const bars = (gantt as unknown as { bars?: object[] }).bars;
+	if (!bars?.length) return;
+	const barProto = Object.getPrototypeOf(bars[0]) as {
+		compute_start_end_date: (this: FrappeBar) => { new_start_date: Date; new_end_date: Date };
+	};
+	barProto.compute_start_end_date = function (this: FrappeBar) {
+		const { column_width, step, unit } = this.gantt.config;
+		const startUnits = snapUnits((this.$bar.getX() / column_width) * step);
+		const new_start_date = addUnits(this.gantt.gantt_start, startUnits, unit);
+		const widthUnits = snapUnits((this.$bar.getWidth() / column_width) * step);
+		const new_end_date = addUnits(new_start_date, widthUnits, unit);
+		return { new_start_date, new_end_date };
+	};
+	barDateMathPatched = true;
+}
+
 /** One file's prior frontmatter values, so a drag-caused write can be reverted. */
 interface UndoFileChange {
 	filePath: string;
@@ -87,12 +135,20 @@ export class GanttChartView extends BasesView {
 	private currentTasks: GanttTask[] = [];
 	private taskMap: Map<string, GanttTask> = new Map();
 	/**
-	 * True from the first on_date_change of a drag until just after the
-	 * mouseup that ends it. While true, onDataUpdated skips rebuilding the
-	 * chart (which would re-sort rows and reset scroll under the user's
-	 * mouse) and on_click ignores the click Frappe dispatches on release.
+	 * True from the first on_date_change of a drag until the mouseup that
+	 * ends it. While true, onDataUpdated skips rebuilding the chart (which
+	 * would re-sort rows and reset scroll under the user's mouse).
 	 */
 	private isDragging = false;
+	/** Where the current mouse gesture on the chart started. */
+	private mouseDownPos: { x: number; y: number } | null = null;
+	/**
+	 * Set on mouseup when the pointer moved since mousedown. Frappe fires a
+	 * plain DOM click on the bar after any release, including a drag that
+	 * snapped back without changing a date, so on_click checks this.
+	 */
+	private lastGestureMoved = false;
+	private static readonly CLICK_SLOP_PX = 4;
 	/** onDataUpdated was skipped during a drag and must re-run once it ends. */
 	private skippedDataUpdate = false;
 	/** Global mouseup handlers Frappe Gantt registers on document (for cleanup). */
@@ -117,9 +173,20 @@ export class GanttChartView extends BasesView {
 		this.containerEl.addClass('bases-gantt-view');
 		this.ganttEl = this.containerEl.createDiv({ cls: 'gantt-wrapper' });
 		this.registerContextMenu();
+		this.registerDomEvent(this.ganttEl, 'mousedown', (evt) => {
+			this.mouseDownPos = { x: evt.clientX, y: evt.clientY };
+		}, true);
 		// Bubble phase on document, so Frappe's own mouseup handler on the
-		// SVG (which fires the final on_date_change) has already run.
-		this.registerDomEvent(document, 'mouseup', () => this.finishDrag());
+		// SVG (which fires the final on_date_change) has already run, and
+		// before the click that follows.
+		this.registerDomEvent(document, 'mouseup', (evt) => {
+			const down = this.mouseDownPos;
+			this.mouseDownPos = null;
+			this.lastGestureMoved = down !== null && Math.hypot(
+				evt.clientX - down.x, evt.clientY - down.y,
+			) > GanttChartView.CLICK_SLOP_PX;
+			this.finishDrag();
+		});
 	}
 
 	onunload(): void {
@@ -196,15 +263,11 @@ export class GanttChartView extends BasesView {
 		if (!batch) return;
 		this.pendingDrag = null;
 
-		// Frappe dispatches a click on the bar right after this mouseup, in
-		// the same task — keep isDragging set until it's been ignored.
-		window.setTimeout(() => {
-			this.isDragging = false;
-			if (this.skippedDataUpdate) {
-				this.skippedDataUpdate = false;
-				this.onDataUpdated();
-			}
-		}, 0);
+		this.isDragging = false;
+		if (this.skippedDataUpdate) {
+			this.skippedDataUpdate = false;
+			this.onDataUpdated();
+		}
 
 		// Drop no-op changes — e.g. the bar was dragged out and back to
 		// exactly where it started before the mouse was released.
@@ -485,13 +548,8 @@ export class GanttChartView extends BasesView {
 			},
 
 			on_click: (task) => {
-				// Frappe fires a plain DOM "click" on the bar group on mouseup
-				// with no drag-awareness of its own, so a drag or resize that
-				// ends with the mouse over the bar would otherwise also open
-				// the note. isDragging spans the whole gesture (see
-				// recordDragChange/finishDrag), so it's still true for the
-				// click that immediately follows a drag-ending mouseup.
-				if (this.isDragging) return;
+				// A release after moving the mouse is a drag, not a click.
+				if (this.lastGestureMoved) return;
 				// Ignore group header phantom tasks
 				if (task.id.startsWith(GROUP_HEADER_PREFIX)) return;
 				const ganttTask = this.findTask(task.id);
@@ -547,6 +605,7 @@ export class GanttChartView extends BasesView {
 
 		try {
 			this.gantt = new Gantt(this.ganttEl, tasks, options);
+			patchBarDateMath(this.gantt);
 		} catch (e) {
 			console.error('Bases Gantt: failed to initialize chart', e);
 			this.ganttEl.empty();
