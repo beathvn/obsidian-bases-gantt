@@ -48,6 +48,28 @@ export default class BasesGanttPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: 'gantt-zoom-in',
+			name: 'Zoom in',
+			icon: 'zoom-in',
+			checkCallback: (checking) => {
+				const view = this.getActiveGanttView();
+				if (checking) return !!view;
+				view?.zoomIn();
+			},
+		});
+
+		this.addCommand({
+			id: 'gantt-zoom-out',
+			name: 'Zoom out',
+			icon: 'zoom-out',
+			checkCallback: (checking) => {
+				const view = this.getActiveGanttView();
+				if (checking) return !!view;
+				view?.zoomOut();
+			},
+		});
+
+		this.addCommand({
 			id: 'gantt-view-day',
 			name: 'Day view',
 			checkCallback: (checking) => {

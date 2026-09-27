@@ -35,7 +35,7 @@ declare module 'frappe-gantt' {
 		lower_header_height?: number;
 		snap_at?: string | null;
 		infinite_padding?: boolean;
-		holidays?: Record<string, string | unknown[]>;
+		holidays?: Record<string, string | unknown[]> | null;
 		ignore?: string[] | ((d: Date) => boolean);
 		language?: string;
 		lines?: 'both' | 'vertical' | 'horizontal' | 'none';

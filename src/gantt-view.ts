@@ -14,45 +14,7 @@ import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
-
-// ── Week view: align to Monday and show the ISO calendar week number ──
-// Frappe Gantt has no option for week-start-day or week numbers, so the
-// shared "Week" view mode object and the date-setup routine are patched
-// directly. This runs once at module load, before any Gantt is constructed.
-function getISOWeekNumber(date: Date): number {
-	const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-	const dayNum = d.getUTCDay() || 7;
-	d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-	const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1);
-	return Math.ceil(((d.getTime() - yearStart) / 86400000 + 1) / 7);
-}
-
-const weekMode = (Gantt as unknown as { VIEW_MODE: { WEEK: Record<string, unknown> } }).VIEW_MODE.WEEK;
-const originalWeekLowerText = weekMode.lower_text as (d: Date, ld: Date, lang: string) => string;
-weekMode.lower_text = (d: Date, ld: Date, lang: string) =>
-	`W${getISOWeekNumber(d)} · ${originalWeekLowerText(d, ld, lang)}`;
-weekMode.column_width = 160;
-
-const ganttProto = Gantt.prototype as unknown as {
-	setup_gantt_dates: (refresh?: boolean) => void;
-	setup_date_values: () => void;
-	setup_dates: (refresh?: boolean) => void;
-	gantt_start: Date;
-	config: { view_mode?: { name?: string } };
-};
-ganttProto.setup_dates = function (this: typeof ganttProto, refresh?: boolean): void {
-	this.setup_gantt_dates(refresh);
-	if (this.config.view_mode?.name === 'Week') {
-		// Roll the computed grid start back to the Monday on/before it so
-		// week columns always begin on Monday instead of an arbitrary day.
-		const day = this.gantt_start.getDay();
-		const diffToMonday = (day + 6) % 7;
-		if (diffToMonday > 0) {
-			this.gantt_start.setDate(this.gantt_start.getDate() - diffToMonday);
-		}
-	}
-	this.setup_date_values();
-};
+import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, withCachedDateFormats } from './zoom';
 
 // ── Bar drag → dates: convert the drag distance in whole days ──
 // Frappe maps a bar's absolute x/width back to dates via
@@ -66,8 +28,6 @@ ganttProto.setup_dates = function (this: typeof ganttProto, refresh?: boolean): 
 // original dates by that — exact in every view, and a move keeps the
 // task's length. Bar isn't exported, so its prototype is patched from the
 // first rendered bar.
-const DAYS_PER_UNIT: Record<string, number> = { hour: 1 / 24, day: 1, month: 30, year: 365 };
-
 interface FrappeBar {
 	/** ox/owidth are set by Frappe on mousedown, before any date is computed. */
 	$bar: { getX(): number; getWidth(): number; ox?: number; owidth?: number };
@@ -173,6 +133,7 @@ export class GanttChartView extends BasesView {
 	 * so changes are collected here and only written on mouseup.
 	 */
 	private pendingDrag: UndoBatch | null = null;
+	private zoom: ZoomController;
 
 	constructor(controller: QueryController, containerEl: HTMLElement) {
 		super(controller);
@@ -184,6 +145,14 @@ export class GanttChartView extends BasesView {
 		this.containerEl.addClass('bases-gantt-view');
 		this.ganttEl = this.containerEl.createDiv({ cls: 'gantt-wrapper' });
 		this.registerContextMenu();
+		this.zoom = new ZoomController(
+			this.getStoredZoom(),
+			() => this.gantt,
+			() => this.applyMilestoneClasses(),
+			(pxPerDay) => this.config.set('zoom', Math.round(pxPerDay * 1000) / 1000),
+		);
+		// Non-passive so a pinch / Ctrl+wheel can be kept from scrolling.
+		this.registerDomEvent(this.ganttEl, 'wheel', (evt) => this.zoom.handleWheel(evt), { passive: false });
 		this.registerDomEvent(this.ganttEl, 'mousedown', (evt) => {
 			this.mouseDownPos = { x: evt.clientX, y: evt.clientY };
 		}, true);
@@ -202,6 +171,7 @@ export class GanttChartView extends BasesView {
 
 	onunload(): void {
 		GanttChartView.instances.delete(this);
+		this.zoom.destroy();
 		if (this.gantt) {
 			this.gantt.clear();
 			this.gantt.$container?.remove();
@@ -316,11 +286,26 @@ export class GanttChartView extends BasesView {
 		});
 	}
 
-	/** Public: switch view mode (for command palette). */
+	/** Public: jump to the zoom level of a former fixed view mode (for command palette). */
 	setViewMode(mode: string): void {
-		if (this.gantt) {
-			this.gantt.change_view_mode(mode, true);
-		}
+		const pxPerDay = VIEW_MODE_ZOOM[mode];
+		if (pxPerDay) this.zoom.zoomTo(pxPerDay);
+	}
+
+	/** Public: zoom around the center of the chart (for command palette). */
+	zoomIn(): void {
+		this.zoom.zoomBy(1.5);
+	}
+
+	zoomOut(): void {
+		this.zoom.zoomBy(1 / 1.5);
+	}
+
+	/** Saved zoom (pixels per day), falling back to the former "View mode" option. */
+	private getStoredZoom(): number {
+		const zoom = this.config?.get('zoom');
+		if (typeof zoom === 'number' && zoom > 0) return zoom;
+		return VIEW_MODE_ZOOM[this.config?.get('viewMode') as string] ?? VIEW_MODE_ZOOM.Day;
 	}
 
 	/** Public: create a new task at today's date (for command palette). */
@@ -388,13 +373,13 @@ export class GanttChartView extends BasesView {
 		if (this.gantt && this.configSnapshot === newSnapshot) {
 			// Only data changed, not config — refresh in place.
 			// Frappe's refresh() re-renders via change_view_mode() with no
-			// "maintain_pos", which jumps scrollLeft back to the chart's
-			// original scroll_to (earliest task / today) — e.g. right after
-			// every drag's write. Save and restore scrollLeft around the
-			// refresh so it never visibly moves.
-			const scrollLeft = this.gantt.$container.scrollLeft;
-			this.gantt.refresh(tasks);
-			this.gantt.$container.scrollLeft = scrollLeft;
+			// "maintain_pos", which jumps back to the chart's original
+			// scroll_to (earliest task / today) — e.g. right after every
+			// drag's write — and recomputes the grid start from the new
+			// task range. Keep the date at the left edge in place instead.
+			const gantt = this.gantt;
+			this.zoom.rerenderInPlace(() => gantt.refresh(tasks));
+			this.applyMilestoneClasses();
 		} else {
 			// Config changed or first render — recreate
 			this.configSnapshot = newSnapshot;
@@ -505,7 +490,6 @@ export class GanttChartView extends BasesView {
 
 	private getDisplayConfigSnapshot(): string {
 		return JSON.stringify({
-			viewMode: this.config.get('viewMode'),
 			barHeight: this.config.get('barHeight'),
 			showProgress: this.config.get('showProgress'),
 			showExpectedProgress: this.config.get('showExpectedProgress'),
@@ -520,13 +504,6 @@ export class GanttChartView extends BasesView {
 		}
 		this.ganttEl.empty();
 
-		// Map stored config values to Frappe Gantt's expected format
-		const VIEW_MODE_MAP: Record<string, string> = {
-			'Quarter day': 'Quarter Day',
-			'Half day': 'Half Day',
-		};
-		const rawViewMode = (this.config.get('viewMode') as string) || 'Day';
-		const viewMode = VIEW_MODE_MAP[rawViewMode] ?? rawViewMode;
 		const barHeight = (this.config.get('barHeight') as number) || 30;
 		const showProgress = (this.config.get('showProgress') as boolean) ?? false;
 		const showExpectedProgress = (this.config.get('showExpectedProgress') as boolean) ?? false;
@@ -535,7 +512,7 @@ export class GanttChartView extends BasesView {
 		const earliestDate = this.getEarliestTaskDate(tasks);
 
 		const options: GanttOptions = {
-			view_mode: viewMode,
+			...this.zoom.ganttOptions(),
 			bar_height: barHeight,
 			today_button: true,
 			scroll_to: earliestDate || 'today',
@@ -615,7 +592,7 @@ export class GanttChartView extends BasesView {
 		}) as typeof document.addEventListener;
 
 		try {
-			this.gantt = new Gantt(this.ganttEl, tasks, options);
+			this.gantt = withCachedDateFormats(() => new Gantt(this.ganttEl, tasks, options));
 			patchBarDateMath(this.gantt);
 		} catch (e) {
 			console.error('Bases Gantt: failed to initialize chart', e);
@@ -626,16 +603,21 @@ export class GanttChartView extends BasesView {
 			document.addEventListener = origAdd;
 		}
 		this.capturedGlobalHandlers = captured;
+		this.applyMilestoneClasses();
+	}
 
-		// Apply milestone class to bar wrappers (can't combine with color class
-		// in custom_class because Frappe Gantt throws on spaces in classList.add)
-		for (const task of tasks) {
+	/**
+	 * Apply the milestone class to bar wrappers (can't combine with color class
+	 * in custom_class because Frappe Gantt throws on spaces in classList.add).
+	 * Needed after every Frappe render, which rebuilds the bars.
+	 */
+	private applyMilestoneClasses(): void {
+		for (const task of this.currentTasks) {
 			if (task.isMilestone) {
 				const wrapper = this.ganttEl.querySelector(`.bar-wrapper[data-id="${task.id}"]`);
 				if (wrapper) wrapper.classList.add('gantt-milestone');
 			}
 		}
-
 	}
 
 	// ── Rich hover popup ──────────────────────────────────────────────
@@ -956,20 +938,6 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 			type: 'group',
 			displayName: 'Display',
 			items: [
-				{
-					type: 'dropdown',
-					key: 'viewMode',
-					displayName: 'View mode',
-					default: 'Day',
-					options: {
-						'Quarter day': 'Quarter day',
-						'Half day': 'Half day',
-						Day: 'Day',
-						Week: 'Week',
-						Month: 'Month',
-						Year: 'Year',
-					},
-				},
 				{
 					type: 'slider',
 					key: 'barHeight',

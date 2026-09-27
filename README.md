@@ -131,9 +131,12 @@ If auto-detection picks the wrong properties (or you want to override it), you c
 - **Color by** — Which property to color-code bars by (e.g., `status` gives each status value a different color)
 - **Progress** — Which numeric property represents completion (only visible when "Show progress" is on)
 
+### Zooming
+
+Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoothly from hours out to years. The date under the pointer stays in place, and the header switches between day, week, month and year columns as you zoom. The zoom level is saved with the view.
+
 ### Display Section
 
-- **View mode** — Zoom level: Quarter Day, Half Day, Day, Week, Month, or Year
 - **Bar height** — How tall the task bars are (16–60 pixels)
 - **Show progress** — Toggle the progress bar overlay on tasks
 - **Show expected progress** — When progress is shown, adds a dashed line indicating where progress *should* be based on how much time has elapsed
@@ -191,10 +194,11 @@ All commands are available via `Cmd/Ctrl + P`:
 |---------|-------------|
 | **Gantt: Scroll to today** | Jumps the chart to today's date |
 | **Gantt: Create new task** | Creates a new note with today's date pre-filled |
-| **Gantt: Day view** | Switch to day-level zoom |
-| **Gantt: Week view** | Switch to week-level zoom |
-| **Gantt: Month view** | Switch to month-level zoom |
-| **Gantt: Year view** | Switch to year-level zoom |
+| **Gantt: Zoom in** / **Zoom out** | Zoom around the center of the chart |
+| **Gantt: Day view** | Jump to day-level zoom |
+| **Gantt: Week view** | Jump to week-level zoom |
+| **Gantt: Month view** | Jump to month-level zoom |
+| **Gantt: Year view** | Jump to year-level zoom |
 
 ---
 
