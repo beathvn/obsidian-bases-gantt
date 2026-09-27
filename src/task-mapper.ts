@@ -13,6 +13,8 @@ export interface GanttTask extends FrappeTask {
 	label: string;
 	filePath: string;
 	isMilestone?: boolean;
+	/** False when the note has no end date and `end` is the display default. */
+	hasEnd: boolean;
 }
 
 /** Configuration for mapping entries to tasks, derived from view options. */
@@ -28,6 +30,9 @@ export interface TaskMapperConfig {
 
 /** Color class palette — maps to CSS classes gantt-color-0 through gantt-color-7. */
 const COLOR_CLASS_COUNT = 8;
+
+/** How long a task without an end date is drawn. */
+const DEFAULT_DURATION_MONTHS = 3;
 
 /**
  * Extract a string representation from an Obsidian Value object.
@@ -92,6 +97,7 @@ export function createGroupHeaderTask(
 		dependencies: '',
 		custom_class: 'gantt-group-header',
 		filePath: '',
+		hasEnd: true,
 	};
 }
 
@@ -143,10 +149,11 @@ export function mapEntriesToTasks(
 			const endVal = entry.getValue(config.endProperty);
 			endDate = parseObsidianDate(extractRawValue(endVal));
 		}
-		// Default: if no end date, task spans 1 day
+		// Default: if no end date, show the task as running 3 months
+		const hasEnd = endDate != null;
 		if (!endDate) {
 			endDate = new Date(startDate);
-			endDate.setDate(endDate.getDate() + 1);
+			endDate.setMonth(endDate.getMonth() + DEFAULT_DURATION_MONTHS);
 		}
 
 		// Ensure end >= start
@@ -249,6 +256,7 @@ export function mapEntriesToTasks(
 			custom_class,
 			filePath: entry.file.path,
 			isMilestone,
+			hasEnd,
 		});
 	}
 

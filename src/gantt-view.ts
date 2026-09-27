@@ -6,6 +6,7 @@ import {
 	type QueryController,
 	DateValue,
 	NumberValue,
+	NullValue,
 	Menu,
 	Notice,
 	MarkdownRenderer,
@@ -129,6 +130,19 @@ interface ScrollState {
 
 const SCROLL_STATE_KEY = 'bases-gantt-scroll';
 const MAX_SCROLL_STATES = 100;
+
+/** Only note (frontmatter) properties can be written; file.* and formula.* are computed. */
+function isNoteProperty(id: BasesPropertyId): boolean {
+	return !id.startsWith('file.') && !id.startsWith('formula.');
+}
+
+/** Whole days from one YYYY-MM-DD date to another. */
+function daysBetween(from: string, to: string): number {
+	const a = parseObsidianDate(from);
+	const b = parseObsidianDate(to);
+	if (!a || !b) return 0;
+	return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
+}
 
 function recordsEqual(a: Record<string, string | number>, b: Record<string, string | number>): boolean {
 	const keys = Object.keys(a);
@@ -436,8 +450,8 @@ export class GanttChartView extends BasesView {
 		const today = formatDateForFrontmatter(new Date());
 		const propName = this.extractPropertyName(config.startProperty);
 		void this.createFileForView('New task', (frontmatter) => {
-			frontmatter[propName] = today;
-			if (config.endProperty) {
+			if (isNoteProperty(config.startProperty!)) frontmatter[propName] = today;
+			if (config.endProperty && isNoteProperty(config.endProperty)) {
 				const endPropName = this.extractPropertyName(config.endProperty);
 				frontmatter[endPropName] = today;
 			}
@@ -552,16 +566,32 @@ export class GanttChartView extends BasesView {
 			return { start: null, end: null, dependencies: null, progress: null, colorBy: null };
 		}
 
-		const firstEntry = entries[0];
+		// Classify each property by the first entry that has a value for it: a
+		// property left empty in the first note (e.g. no end date yet) must
+		// still be detected from the others.
 		const dateProps: BasesPropertyId[] = [];
 		const numberProps: BasesPropertyId[] = [];
 		const stringProps: BasesPropertyId[] = [];
+		/** Note properties with no value in any entry, e.g. an end date nobody has set yet. */
+		const emptyProps: BasesPropertyId[] = [];
 
 		for (const propId of this.allProperties) {
-			const val = firstEntry.getValue(propId);
-			if (val == null) continue;
+			let val = null;
+			for (const entry of entries) {
+				const v = entry.getValue(propId);
+				if (v != null && !(v instanceof NullValue)) {
+					val = v;
+					break;
+				}
+			}
+			if (val == null) {
+				if (propId.startsWith('note.')) emptyProps.push(propId);
+				continue;
+			}
 			if (val instanceof DateValue) {
-				dateProps.push(propId);
+				// file.ctime/mtime are read-only: as a start or end they'd be
+				// written back into the note as a stray "ctime"/"mtime" property.
+				if (!propId.startsWith('file.')) dateProps.push(propId);
 			} else if (val instanceof NumberValue) {
 				numberProps.push(propId);
 			} else {
@@ -586,11 +616,18 @@ export class GanttChartView extends BasesView {
 		const startKeywords = ['start', 'begin', 'from', 'created'];
 		const endKeywords = ['end', 'due', 'finish', 'deadline', 'until'];
 
+		// An end property that's empty in every note still has the right name.
 		let start = findByKeywords(dateProps, startKeywords);
-		let end = findByKeywords(dateProps, endKeywords);
+		// Without a value to go on, require a date-like name ("endDate", "due")
+		// so e.g. an empty "attendees" isn't mistaken for it.
+		const datelikeEmpty = emptyProps.filter((p) => {
+			const name = getName(p);
+			return name.includes('date') || endKeywords.some((k) => name.startsWith(k));
+		});
+		let end = findByKeywords(dateProps, endKeywords) ?? findByKeywords(datelikeEmpty, endKeywords);
 
 		if (!start && dateProps.length > 0) start = dateProps[0];
-		if (!end && dateProps.length > 1) end = dateProps.find(p => p !== start) ?? null;
+		if (!end) end = dateProps.find(p => p !== start) ?? null;
 
 		// Dependencies: look for link-like string properties
 		const depKeywords = ['depend', 'block', 'after', 'prerequisite', 'requires'];
@@ -685,15 +722,20 @@ export class GanttChartView extends BasesView {
 				const updates: Record<string, string> = {};
 				const previous: Record<string, string> = {};
 
-				if (mapperConfig.startProperty) {
+				if (mapperConfig.startProperty && isNoteProperty(mapperConfig.startProperty)) {
 					const propName = this.extractPropertyName(mapperConfig.startProperty);
 					previous[propName] = ganttTask.start;
 					updates[propName] = formatDateForFrontmatter(start);
 				}
-				if (mapperConfig.endProperty) {
+				// A task without an end date only gets one once its end is
+				// resized; moving the bar keeps it open-ended.
+				const newStart = formatDateForFrontmatter(start);
+				const newEnd = formatDateForFrontmatter(end);
+				const resized = daysBetween(newStart, newEnd) !== daysBetween(ganttTask.start, ganttTask.end);
+				if (mapperConfig.endProperty && isNoteProperty(mapperConfig.endProperty) && (ganttTask.hasEnd || resized)) {
 					const propName = this.extractPropertyName(mapperConfig.endProperty);
-					previous[propName] = ganttTask.end;
-					updates[propName] = formatDateForFrontmatter(end);
+					previous[propName] = ganttTask.hasEnd ? ganttTask.end : '';
+					updates[propName] = newEnd;
 				}
 
 				// Written once on mouseup by finishDrag(), not per tick.
@@ -935,8 +977,8 @@ export class GanttChartView extends BasesView {
 
 		const propName = this.extractPropertyName(config.startProperty);
 		void this.createFileForView('New task', (frontmatter) => {
-			frontmatter[propName] = formattedDate;
-			if (config.endProperty) {
+			if (isNoteProperty(config.startProperty!)) frontmatter[propName] = formattedDate;
+			if (config.endProperty && isNoteProperty(config.endProperty)) {
 				const endPropName = this.extractPropertyName(config.endProperty);
 				frontmatter[endPropName] = formattedDate;
 			}
