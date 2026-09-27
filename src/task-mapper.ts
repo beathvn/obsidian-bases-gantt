@@ -4,6 +4,13 @@ import { parseObsidianDate, formatDateForGantt } from './date-utils';
 
 /** Extended task type carrying the original file path for click-to-open. */
 export interface GanttTask extends FrappeTask {
+	/**
+	 * HTML-escaped label. Frappe Gantt writes `name` with innerHTML (bar label,
+	 * popup), so it must never hold raw note text. Use `label` for plain text.
+	 */
+	name: string;
+	/** Unescaped label, for plain-text uses (notices, textContent). */
+	label: string;
 	filePath: string;
 	isMilestone?: boolean;
 }
@@ -43,6 +50,16 @@ function makeTaskId(filePath: string): string {
 	return filePath.replace(/ /g, '_');
 }
 
+/** Escape text for safe insertion as HTML. */
+export function escapeHtml(str: string): string {
+	return str
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
 /** Prefix used to identify group header phantom tasks. */
 export const GROUP_HEADER_PREFIX = '__group__';
 
@@ -67,7 +84,8 @@ export function createGroupHeaderTask(
 
 	return {
 		id: `${GROUP_HEADER_PREFIX}${groupIndex}`,
-		name: groupLabel,
+		name: escapeHtml(groupLabel),
+		label: groupLabel,
 		start: minStart,
 		end: maxEnd,
 		progress: 0,
@@ -222,7 +240,8 @@ export function mapEntriesToTasks(
 
 		tasks.push({
 			id: makeTaskId(entry.file.path),
-			name,
+			name: escapeHtml(name),
+			label: name,
 			start: formatDateForGantt(startDate),
 			end: formatDateForGantt(endDate),
 			progress,

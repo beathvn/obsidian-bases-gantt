@@ -12,9 +12,9 @@ import {
 } from 'obsidian';
 import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
-import { mapEntriesToTasks, createGroupHeaderTask, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
+import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
-import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, drawQuarterBackdrop, withCachedDateFormats } from './zoom';
+import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll } from './zoom';
 
 // ── Drag moves the whole dependency chain ──
 // Frappe's get_all_dependent_tasks marks each level as seen before filtering
@@ -115,6 +115,21 @@ interface UndoBatch {
 	changes: UndoFileChange[];
 }
 
+/**
+ * Where a chart was scrolled to, so leaving a base and coming back (or an
+ * Obsidian restart) puts the view where it was. Kept per device in the
+ * vault's local storage rather than the .base file, which would otherwise
+ * be rewritten on every pan. Zoom lives in the view config instead.
+ */
+interface ScrollState {
+	/** Date at the left edge, as epoch ms (robust to the grid range changing). */
+	left: number;
+	top: number;
+}
+
+const SCROLL_STATE_KEY = 'bases-gantt-scroll';
+const MAX_SCROLL_STATES = 100;
+
 function recordsEqual(a: Record<string, string | number>, b: Record<string, string | number>): boolean {
 	const keys = Object.keys(a);
 	if (keys.length !== Object.keys(b).length) return false;
@@ -162,6 +177,13 @@ export class GanttChartView extends BasesView {
 	 */
 	private pendingDrag: UndoBatch | null = null;
 	private zoom: ZoomController;
+	/** First chart of this view not yet built, so the saved zoom hasn't been applied. */
+	private zoomRestored = false;
+	/** Latest pan position, restored whenever the chart is rebuilt. */
+	private scrollState: ScrollState | null | undefined;
+	private scrollStateKey: string | null = null;
+	private scrollSaveTimer = 0;
+	private static readonly SCROLL_SAVE_MS = 500;
 
 	constructor(controller: QueryController, containerEl: HTMLElement) {
 		super(controller);
@@ -202,11 +224,14 @@ export class GanttChartView extends BasesView {
 			) > GanttChartView.CLICK_SLOP_PX;
 			this.finishDrag();
 		});
+		// Scroll doesn't bubble, but it does pass ancestors in the capture phase.
+		this.registerDomEvent(this.ganttEl, 'scroll', () => this.recordScroll(), { capture: true, passive: true });
 	}
 
 	onunload(): void {
 		GanttChartView.instances.delete(this);
 		this.zoom.destroy();
+		if (this.scrollSaveTimer) this.saveScrollState();
 		if (this.gantt) {
 			this.gantt.clear();
 			this.gantt.$container?.remove();
@@ -343,6 +368,64 @@ export class GanttChartView extends BasesView {
 		return VIEW_MODE_ZOOM[this.config?.get('viewMode') as string] ?? VIEW_MODE_ZOOM.Day;
 	}
 
+	/** Identifies this view across reopenings: the base (or note embedding it) plus the view name. */
+	private getScrollStateKey(): string | null {
+		// Cached: by onunload the leaf may already show another file.
+		if (this.scrollStateKey) return this.scrollStateKey;
+		let path: string | undefined;
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (!path && leaf.view.containerEl.contains(this.containerEl)) {
+				path = (leaf.view as { file?: { path: string } }).file?.path;
+			}
+		});
+		if (path) this.scrollStateKey = `${path}::${this.config?.name ?? ''}`;
+		return this.scrollStateKey;
+	}
+
+	private loadScrollStates(): Record<string, ScrollState> {
+		const states: unknown = this.app.loadLocalStorage(SCROLL_STATE_KEY);
+		return states && typeof states === 'object' ? states as Record<string, ScrollState> : {};
+	}
+
+	private getSavedScrollState(): ScrollState | null {
+		if (this.scrollState !== undefined) return this.scrollState;
+		const key = this.getScrollStateKey();
+		const state = key ? this.loadScrollStates()[key] : undefined;
+		this.scrollState = state && typeof state.left === 'number' ? state : null;
+		return this.scrollState;
+	}
+
+	private recordScroll(): void {
+		const left = this.zoom.leftEdgeDate();
+		if (!left || !this.gantt) return;
+		const top = this.ganttEl.scrollTop || this.gantt.$container.scrollTop;
+		this.scrollState = { left: left.getTime(), top };
+		window.clearTimeout(this.scrollSaveTimer);
+		this.scrollSaveTimer = window.setTimeout(() => this.saveScrollState(), GanttChartView.SCROLL_SAVE_MS);
+	}
+
+	private saveScrollState(): void {
+		window.clearTimeout(this.scrollSaveTimer);
+		this.scrollSaveTimer = 0;
+		const key = this.getScrollStateKey();
+		if (!key || !this.scrollState) return;
+		const states = this.loadScrollStates();
+		// Re-insert so the key order is least recently used first.
+		delete states[key];
+		states[key] = this.scrollState;
+		const keys = Object.keys(states);
+		for (const old of keys.slice(0, Math.max(0, keys.length - MAX_SCROLL_STATES))) delete states[old];
+		this.app.saveLocalStorage(SCROLL_STATE_KEY, states);
+	}
+
+	/** Put the chart back where it was scrolled to (after Frappe's constructor, which we kept from scrolling). */
+	private restoreScroll(state: ScrollState): void {
+		if (!this.gantt) return;
+		this.zoom.scrollLeftTo(new Date(state.left));
+		if (this.ganttEl.scrollHeight > this.ganttEl.clientHeight) this.ganttEl.scrollTop = state.top;
+		else this.gantt.$container.scrollTop = state.top;
+	}
+
 	/** Public: create a new task at today's date (for command palette). */
 	createTaskAtToday(): void {
 		const config = this.getTaskMapperConfig();
@@ -430,14 +513,15 @@ export class GanttChartView extends BasesView {
 		let colorByProperty = this.config.getAsPropertyId('colorBy');
 		let progressProperty = this.config.getAsPropertyId('progress');
 
-		// Auto-detect properties from data when not manually configured
+		// Auto-detect properties from data when not manually configured.
+		// Manually configured properties always win over detected ones.
 		if (!startProperty && this.data?.data?.length > 0) {
 			const detected = this.autoDetectProperties();
-			startProperty = detected.start ?? startProperty;
-			endProperty = detected.end ?? endProperty;
-			dependenciesProperty = detected.dependencies ?? dependenciesProperty;
-			progressProperty = detected.progress ?? progressProperty;
-			colorByProperty = detected.colorBy ?? colorByProperty;
+			startProperty = detected.start;
+			endProperty = endProperty ?? detected.end;
+			dependenciesProperty = dependenciesProperty ?? detected.dependencies;
+			progressProperty = progressProperty ?? detected.progress;
+			colorByProperty = colorByProperty ?? detected.colorBy;
 		}
 
 		return {
@@ -539,6 +623,14 @@ export class GanttChartView extends BasesView {
 		}
 		this.ganttEl.empty();
 
+		// The view config isn't available yet in onload, so apply the saved
+		// zoom here, before the first chart is built.
+		if (!this.zoomRestored) {
+			this.zoomRestored = true;
+			this.zoom.zoomTo(this.getStoredZoom());
+		}
+		const savedScroll = this.getSavedScrollState();
+
 		const barHeight = (this.config.get('barHeight') as number) || 30;
 		const showProgress = (this.config.get('showProgress') as boolean) ?? false;
 		const showExpectedProgress = (this.config.get('showExpectedProgress') as boolean) ?? false;
@@ -605,7 +697,7 @@ export class GanttChartView extends BasesView {
 				}
 
 				// Written once on mouseup by finishDrag(), not per tick.
-				this.recordDragChange(ganttTask.filePath, `Moved "${ganttTask.name}"`, previous, updates);
+				this.recordDragChange(ganttTask.filePath, `Moved "${ganttTask.label}"`, previous, updates);
 			},
 
 			on_date_click: (dateStr: string) => {
@@ -630,7 +722,8 @@ export class GanttChartView extends BasesView {
 		}) as typeof document.addEventListener;
 
 		try {
-			this.gantt = withCachedDateFormats(() => new Gantt(this.ganttEl, tasks, options));
+			const create = (): Gantt => withCachedDateFormats(() => new Gantt(this.ganttEl, tasks, options));
+			this.gantt = savedScroll ? withoutInitialScroll(create) : create();
 			patchBarDateMath(this.gantt);
 		} catch (e) {
 			console.error('Bases Gantt: failed to initialize chart', e);
@@ -642,6 +735,7 @@ export class GanttChartView extends BasesView {
 		}
 		this.capturedGlobalHandlers = captured;
 		this.afterRender();
+		if (savedScroll) this.restoreScroll(savedScroll);
 	}
 
 	/** Decorations Frappe doesn't draw itself; needed after every Frappe render, which rebuilds the SVG. */
@@ -666,12 +760,14 @@ export class GanttChartView extends BasesView {
 
 		// Group headers: just show the label
 		if (!ganttTask || ganttTask.id.startsWith(GROUP_HEADER_PREFIX)) {
-			ctx.set_title(`<strong>${this.escapeHtml(ctx.task.name)}</strong>`);
+			// ctx.task.name is already escaped by the task mapper.
+			const title = ganttTask ? escapeHtml(ganttTask.label) : ctx.task.name;
+			ctx.set_title(`<strong>${title}</strong>`);
 			return;
 		}
 
 		// Title
-		ctx.set_title(this.escapeHtml(ctx.task.name));
+		ctx.set_title(escapeHtml(ganttTask.label));
 
 		// Subtitle: date range + duration
 		const start = ctx.task._start;
@@ -701,7 +797,7 @@ export class GanttChartView extends BasesView {
 				.map(d => d.trim()).filter(Boolean)
 				.map(depId => {
 					const depTask = this.findTask(depId);
-					return depTask ? this.escapeHtml(depTask.name) : depId;
+					return escapeHtml(depTask ? depTask.label : depId);
 				});
 			if (depNames.length > 0) {
 				parts.push(`<div class="gantt-popup-deps">Depends on: ${depNames.join(', ')}</div>`);
@@ -744,11 +840,6 @@ export class GanttChartView extends BasesView {
 	private formatDisplayDate(date: Date): string {
 		const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 		return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
-	}
-
-	/** Escape HTML to prevent XSS in popup content. */
-	private escapeHtml(str: string): string {
-		return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 	}
 
 	// ── Right-click context menus ─────────────────────────────────────

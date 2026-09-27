@@ -191,6 +191,20 @@ ganttProto.setup_dates = function (this: FrappeInternals, refresh?: boolean): vo
 	this.setup_date_values();
 };
 
+/**
+ * Construct a chart without Frappe's initial smooth scroll to
+ * options.scroll_to, so a remembered position can be restored instead.
+ */
+export function withoutInitialScroll<T>(create: () => T): T {
+	const original = ganttProto.set_scroll_position;
+	ganttProto.set_scroll_position = () => {};
+	try {
+		return create();
+	} finally {
+		ganttProto.set_scroll_position = original;
+	}
+}
+
 // ── Date ↔ x, mirroring Frappe's own mapping ──
 
 /** Frappe's date_utils.diff (unrounded): months count day D of a month as D/31. */
@@ -494,6 +508,22 @@ export class ZoomController {
 		if (!gantt) return render();
 		const g = internals(gantt);
 		this.renderAnchored(g, render, dateForX(g, g.$container.scrollLeft), 0);
+	}
+
+	/** The date at the chart's left edge, to restore the pan position later. */
+	leftEdgeDate(): Date | null {
+		const gantt = this.getGantt();
+		if (!gantt) return null;
+		const g = internals(gantt);
+		return dateForX(g, g.$container.scrollLeft);
+	}
+
+	/** Scroll so that `date` sits at the left edge, without animation. */
+	scrollLeftTo(date: Date): void {
+		const gantt = this.getGantt();
+		if (!gantt) return;
+		const g = internals(gantt);
+		g.$container.scrollLeft = xForDate(g, date);
 	}
 
 	destroy(): void {
