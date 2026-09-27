@@ -14,7 +14,7 @@ import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
-import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, withCachedDateFormats } from './zoom';
+import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, drawQuarterBackdrop, withCachedDateFormats } from './zoom';
 
 // ── Bar drag → dates: convert the drag distance in whole days ──
 // Frappe maps a bar's absolute x/width back to dates via
@@ -148,7 +148,7 @@ export class GanttChartView extends BasesView {
 		this.zoom = new ZoomController(
 			this.getStoredZoom(),
 			() => this.gantt,
-			() => this.applyMilestoneClasses(),
+			() => this.afterRender(),
 			(pxPerDay) => this.config.set('zoom', Math.round(pxPerDay * 1000) / 1000),
 		);
 		// Non-passive so a pinch / Ctrl+wheel can be kept from scrolling.
@@ -379,7 +379,7 @@ export class GanttChartView extends BasesView {
 			// task range. Keep the date at the left edge in place instead.
 			const gantt = this.gantt;
 			this.zoom.rerenderInPlace(() => gantt.refresh(tasks));
-			this.applyMilestoneClasses();
+			this.afterRender();
 		} else {
 			// Config changed or first render — recreate
 			this.configSnapshot = newSnapshot;
@@ -603,15 +603,15 @@ export class GanttChartView extends BasesView {
 			document.addEventListener = origAdd;
 		}
 		this.capturedGlobalHandlers = captured;
-		this.applyMilestoneClasses();
+		this.afterRender();
 	}
 
-	/**
-	 * Apply the milestone class to bar wrappers (can't combine with color class
-	 * in custom_class because Frappe Gantt throws on spaces in classList.add).
-	 * Needed after every Frappe render, which rebuilds the bars.
-	 */
-	private applyMilestoneClasses(): void {
+	/** Decorations Frappe doesn't draw itself; needed after every Frappe render, which rebuilds the SVG. */
+	private afterRender(): void {
+		if (!this.gantt) return;
+		drawQuarterBackdrop(this.gantt);
+		// Milestone class can't be combined with the color class in
+		// custom_class: Frappe Gantt throws on spaces in classList.add.
 		for (const task of this.currentTasks) {
 			if (task.isMilestone) {
 				const wrapper = this.ganttEl.querySelector(`.bar-wrapper[data-id="${task.id}"]`);

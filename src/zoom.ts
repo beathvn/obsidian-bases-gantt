@@ -129,8 +129,10 @@ function createViewModes(getPxPerDay: () => number): FrappeViewMode[] {
 interface FrappeInternals {
 	gantt_start: Date;
 	gantt_end: Date;
+	grid_height: number;
+	layers?: { grid: SVGGElement };
 	tasks: { _start: Date; _end: Date }[];
-	config: { column_width: number; step: number; unit: string; view_mode?: { name?: string } };
+	config: { column_width: number; step: number; unit: string; header_height: number; view_mode?: { name?: string } };
 	options: { column_width?: number | null; holidays?: Record<string, string> | null };
 	$container: HTMLElement;
 	change_view_mode(mode?: string, maintain_pos?: boolean): void;
@@ -213,6 +215,61 @@ function dateForX(g: FrappeInternals, x: number): Date {
 	}
 	// Overflowing the ms field adds wall-clock time, like Frappe's DST-corrected diff.
 	return new Date(s.getFullYear(), s.getMonth(), s.getDate(), s.getHours(), 0, 0, units * DAY_MS * DAYS_PER_UNIT[unit]);
+}
+
+// ── Quarter backdrop ──
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag: string, attrs: Record<string, string | number>, parent: Element): SVGElement {
+	const el = document.createElementNS(SVG_NS, tag);
+	for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+	parent.appendChild(el);
+	return el;
+}
+
+/**
+ * In Month zoom, faintly shade every other calendar quarter and put a large
+ * "Q1"–"Q4" label in each. Drawn at the end of Frappe's grid layer, so it
+ * sits above the row backgrounds but below arrows and bars. Must run after
+ * every Frappe render, which rebuilds the SVG.
+ */
+export function drawQuarterBackdrop(gantt: Gantt): void {
+	const g = internals(gantt);
+	const grid = g.layers?.grid;
+	if (g.config.unit !== 'month' || !grid) return;
+
+	const top = g.config.header_height;
+	const height = g.grid_height - top;
+	if (height <= 0) return;
+	// gantt_start is the 1st of a month in Month zoom, so month boundaries
+	// fall exactly on the column lines.
+	const start = g.gantt_start;
+	const columnsPerMonth = 1 / g.config.step;
+	const xOfMonth = (d: Date): number =>
+		((d.getFullYear() - start.getFullYear()) * 12 + d.getMonth() - start.getMonth()) *
+		columnsPerMonth * g.config.column_width;
+
+	const group = svgEl('g', { class: 'gantt-quarters' }, grid);
+	let q = new Date(start.getFullYear(), Math.floor(start.getMonth() / 3) * 3, 1);
+	while (q < g.gantt_end) {
+		const next = new Date(q.getFullYear(), q.getMonth() + 3, 1);
+		const x0 = Math.max(0, xOfMonth(q));
+		const x1 = xOfMonth(next);
+		const quarter = Math.floor(q.getMonth() / 3) + 1;
+		if (quarter % 2 === 0) {
+			svgEl('rect', { class: 'gantt-quarter-band', x: x0, y: top, width: x1 - x0, height }, group);
+		}
+		const fontSize = Math.max(18, Math.min(72, height * 0.5, (x1 - x0) * 0.4));
+		const label = svgEl('text', {
+			class: 'gantt-quarter-label',
+			x: (x0 + x1) / 2,
+			y: top + Math.min(height / 2, fontSize),
+			'font-size': fontSize,
+		}, group);
+		label.textContent = `Q${quarter}`;
+		q = next;
+	}
 }
 
 // ── Render speed ──

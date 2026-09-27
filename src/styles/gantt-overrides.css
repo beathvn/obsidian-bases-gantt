@@ -360,3 +360,23 @@
 .gantt-undo-notice-btn:hover {
 	background: var(--interactive-accent-hover);
 }
+
+/* ── Quarter backdrop (Month zoom) ───────────────────────────────── */
+
+.bases-gantt-view .gantt .gantt-quarters {
+	pointer-events: none;
+}
+
+.bases-gantt-view .gantt .gantt-quarter-band {
+	fill: var(--text-normal);
+	opacity: 0.025;
+}
+
+.bases-gantt-view .gantt .gantt-quarter-label {
+	fill: var(--text-faint);
+	opacity: 0.25;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	text-anchor: middle;
+	dominant-baseline: middle;
+}
