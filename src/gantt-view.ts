@@ -54,33 +54,32 @@ ganttProto.setup_dates = function (this: typeof ganttProto, refresh?: boolean): 
 	this.setup_date_values();
 };
 
-// ── Bar pixel→date conversion: fix off-by-one from float truncation ──
-// Frappe converts a bar's x/width to dates via date_utils.add(), which
-// parseInt()s the unit count. In Week view one day is column_width/7 px, so
-// x/column_width*7 comes out like 4.9999999 for some days (e.g. Saturday)
-// and truncates to the day before. Snap near-integers before adding. Bar
-// isn't exported, so its prototype is patched from the first rendered bar.
+// ── Bar drag → dates: convert the drag distance in whole days ──
+// Frappe maps a bar's absolute x/width back to dates via
+// date_utils.add(gantt_start, x/column_width*step, unit), which parseInt()s
+// the count. That truncates float noise in Week view (Saturday → Friday)
+// and, in Month/Year view, whole months/years: every drag snaps the start
+// to the 1st and collapses short tasks. Its date→x mapping also differs
+// from its width math there, so an exact inverse isn't possible. Instead,
+// convert how far each edge moved since mousedown into days (using the
+// same days-per-unit Frappe uses for widths and snapping) and shift the
+// original dates by that — exact in every view, and a move keeps the
+// task's length. Bar isn't exported, so its prototype is patched from the
+// first rendered bar.
+const DAYS_PER_UNIT: Record<string, number> = { hour: 1 / 24, day: 1, month: 30, year: 365 };
+
 interface FrappeBar {
-	$bar: { getX(): number; getWidth(): number };
-	gantt: { gantt_start: Date; config: { column_width: number; step: number; unit: string } };
+	/** ox/owidth are set by Frappe on mousedown, before any date is computed. */
+	$bar: { getX(): number; getWidth(): number; ox?: number; owidth?: number };
+	task: { _start: Date; _end: Date };
+	gantt: { config: { column_width: number; step: number; unit: string } };
+	dragOrigin?: { ox: number; owidth: number; start: Date; end: Date };
 }
 
-function snapUnits(n: number): number {
-	const rounded = Math.round(n);
-	return Math.abs(n - rounded) < 1e-6 ? rounded : n;
-}
-
-function addUnits(date: Date, qty: number, unit: string): Date {
-	const q = Math.trunc(qty);
-	return new Date(
-		date.getFullYear() + (unit === 'year' ? q : 0),
-		date.getMonth() + (unit === 'month' ? q : 0),
-		date.getDate() + (unit === 'day' ? q : 0),
-		date.getHours() + (unit === 'hour' ? q : 0),
-		date.getMinutes() + (unit === 'minute' ? q : 0),
-		date.getSeconds() + (unit === 'second' ? q : 0),
-		date.getMilliseconds() + (unit === 'millisecond' ? q : 0),
-	);
+function addDays(date: Date, days: number): Date {
+	const d = new Date(date);
+	d.setDate(d.getDate() + days);
+	return d;
 }
 
 let barDateMathPatched = false;
@@ -92,12 +91,24 @@ function patchBarDateMath(gantt: Gantt): void {
 		compute_start_end_date: (this: FrappeBar) => { new_start_date: Date; new_end_date: Date };
 	};
 	barProto.compute_start_end_date = function (this: FrappeBar) {
+		const bar = this.$bar;
+		const ox = bar.ox ?? bar.getX();
+		const owidth = bar.owidth ?? bar.getWidth();
+		// Capture the pre-drag dates on the first computation of each gesture
+		// (task._start/_end get overwritten as the drag progresses). A new
+		// mousedown with the bar elsewhere changes ox/owidth; one where it
+		// ended back in place has unchanged dates, so the origin still holds.
+		if (!this.dragOrigin || this.dragOrigin.ox !== ox || this.dragOrigin.owidth !== owidth) {
+			this.dragOrigin = { ox, owidth, start: new Date(this.task._start), end: new Date(this.task._end) };
+		}
 		const { column_width, step, unit } = this.gantt.config;
-		const startUnits = snapUnits((this.$bar.getX() / column_width) * step);
-		const new_start_date = addUnits(this.gantt.gantt_start, startUnits, unit);
-		const widthUnits = snapUnits((this.$bar.getWidth() / column_width) * step);
-		const new_end_date = addUnits(new_start_date, widthUnits, unit);
-		return { new_start_date, new_end_date };
+		const pxPerDay = column_width / (step * DAYS_PER_UNIT[unit]);
+		const startShift = Math.round((bar.getX() - ox) / pxPerDay);
+		const endShift = Math.round((bar.getX() + bar.getWidth() - ox - owidth) / pxPerDay);
+		return {
+			new_start_date: addDays(this.dragOrigin.start, startShift),
+			new_end_date: addDays(this.dragOrigin.end, endShift),
+		};
 	};
 	barDateMathPatched = true;
 }
