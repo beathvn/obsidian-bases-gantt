@@ -252,6 +252,12 @@ function formatPropertyValue(value: unknown): string {
 	return String(value).replace(/\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g, (_, target: string, alias?: string) => alias ?? target);
 }
 
+/** "plannedStart", "planned_start", "Planned-Start" … (the planned start's default name). */
+function isPlannedStartName(id: BasesPropertyId): boolean {
+	const dot = id.indexOf('.');
+	return (dot >= 0 ? id.slice(dot + 1) : id).toLowerCase().replace(/[-_ ]/g, '') === 'plannedstart';
+}
+
 function isNoteProperty(id: BasesPropertyId): boolean {
 	return !id.startsWith('file.') && !id.startsWith('formula.');
 }
@@ -691,6 +697,10 @@ export class GanttChartView extends BasesView {
 		// Never auto-detected: without "Color by" all bars use the accent color.
 		const colorByProperty = this.config.getAsPropertyId('colorBy');
 		let progressProperty = this.config.getAsPropertyId('progress');
+		// Without configuring it, a note property named "plannedStart" is used.
+		const plannedStartProperty = this.config.getAsPropertyId('plannedStart')
+			?? this.allProperties.find((p) => p.startsWith('note.') && isPlannedStartName(p))
+			?? null;
 
 		// Auto-detect properties from data when not manually configured.
 		// Manually configured properties always win over detected ones.
@@ -708,6 +718,7 @@ export class GanttChartView extends BasesView {
 
 		return {
 			startProperty,
+			plannedStartProperty,
 			endProperty,
 			labelProperty,
 			dependenciesProperty,
@@ -753,13 +764,14 @@ export class GanttChartView extends BasesView {
 				}
 			}
 			if (val == null) {
-				if (propId.startsWith('note.')) emptyProps.push(propId);
+				if (propId.startsWith('note.') && !isPlannedStartName(propId)) emptyProps.push(propId);
 				continue;
 			}
 			if (val instanceof DateValue) {
 				// file.ctime/mtime are read-only: as a start or end they'd be
 				// written back into the note as a stray "ctime"/"mtime" property.
-				if (!propId.startsWith('file.')) dateProps.push(propId);
+				// The planned start has its own option and is never the start or end.
+				if (!propId.startsWith('file.') && !isPlannedStartName(propId)) dateProps.push(propId);
 			} else if (val instanceof NumberValue) {
 				numberProps.push(propId);
 			} else {
@@ -889,8 +901,10 @@ export class GanttChartView extends BasesView {
 				const updates: Record<string, string> = {};
 				const previous: Record<string, string> = {};
 
-				if (mapperConfig.startProperty && isNoteProperty(mapperConfig.startProperty)) {
-					const propName = this.extractPropertyName(mapperConfig.startProperty);
+				// A bar drawn from the planned start moves that; the start date stays as it was.
+				const startProperty = ganttTask.startsPlanned ? mapperConfig.plannedStartProperty : mapperConfig.startProperty;
+				if (startProperty && isNoteProperty(startProperty)) {
+					const propName = this.extractPropertyName(startProperty);
 					previous[propName] = ganttTask.start;
 					updates[propName] = formatDateForFrontmatter(start);
 				}
@@ -954,10 +968,12 @@ export class GanttChartView extends BasesView {
 	/** Decorations Frappe doesn't draw itself; needed after every Frappe render, which rebuilds the SVG. */
 	private afterRender(): void {
 		if (!this.gantt) return;
+		const showOriginalStart = this.config.get('showOriginalStart') === true;
 		drawQuarterBackdrop(this.gantt);
 		// Milestone class can't be combined with the color class in
 		// custom_class: Frappe Gantt throws on spaces in classList.add.
 		for (const task of this.currentTasks) {
+			if (task.originalStart && showOriginalStart) this.drawOriginalStart(task);
 			if (!task.isMilestone && !task.hue) continue;
 			const wrapper = this.ganttEl.querySelector<HTMLElement>(`.bar-wrapper[data-id="${task.id}"]`);
 			if (!wrapper) continue;
@@ -997,8 +1013,13 @@ export class GanttChartView extends BasesView {
 			);
 		}
 
-		// Details: progress bar + dependencies + hint
+		// Details: original start + progress bar + dependencies + hint
 		const parts: string[] = [];
+
+		const originalStart = ganttTask.originalStart ? parseObsidianDate(ganttTask.originalStart) : null;
+		if (originalStart) {
+			parts.push(`<div class="gantt-popup-deps">Started ${this.formatDisplayDate(originalStart)}</div>`);
+		}
 
 		if (showProgress && ctx.task.progress != null) {
 			const pct = Math.round(ctx.task.progress);
@@ -1054,6 +1075,27 @@ export class GanttChartView extends BasesView {
 			);
 		}
 		return rows.length > 0 ? `<div class="gantt-popup-props">${rows.join('')}</div>` : null;
+	}
+
+	/** A faint line from the note's own start to its bar, which begins at the planned start. */
+	private drawOriginalStart(task: GanttTask): void {
+		const gantt = this.gantt;
+		const start = task.originalStart ? parseObsidianDate(task.originalStart) : null;
+		const bar = this.ganttEl.querySelector<SVGRectElement>(`.bar-wrapper[data-id="${task.id}"] .bar`);
+		if (!gantt || !start || !bar?.parentElement) return;
+		const barX = Number(bar.getAttribute('x'));
+		// It can start before the grid, which only spans the bars.
+		const x = Math.max(0, xForDate(gantt, start));
+		if (!(x < barX)) return;
+		const y = Number(bar.getAttribute('y')) + Number(bar.getAttribute('height')) / 2;
+		const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+		line.setAttribute('class', 'gantt-original-start');
+		line.setAttribute('x1', String(x));
+		line.setAttribute('x2', String(barX));
+		line.setAttribute('y1', String(y));
+		line.setAttribute('y2', String(y));
+		// Behind the bar, in its group so it shares the bar's color.
+		bar.parentElement.prepend(line);
 	}
 
 	/** Move the popup up / left as far as needed to show it whole inside the visible part of the chart. */
@@ -1329,6 +1371,12 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 				},
 				{
 					type: 'property',
+					key: 'plannedStart',
+					displayName: 'Planned start',
+					placeholder: 'plannedStart (default)',
+				},
+				{
+					type: 'property',
 					key: 'endDate',
 					displayName: 'End date',
 					placeholder: 'Select property...',
@@ -1385,6 +1433,12 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 					displayName: 'Show expected progress',
 					default: false,
 					shouldHide: () => !(config.get('showProgress') as boolean),
+				},
+				{
+					type: 'toggle',
+					key: 'showOriginalStart',
+					displayName: 'Show original start',
+					default: false,
 				},
 				{
 					type: 'toggle',

@@ -17,11 +17,17 @@ export interface GanttTask extends FrappeTask {
 	hasEnd: boolean;
 	/** Color the user fixed for this task's color-by value, instead of a palette class. */
 	hue?: string;
+	/** The bar starts at the note's planned start, so drags move that and leave the start date alone. */
+	startsPlanned: boolean;
+	/** With a planned start: the note's own start date (YYYY-MM-DD), kept for display. */
+	originalStart?: string;
 }
 
 /** Configuration for mapping entries to tasks, derived from view options. */
 export interface TaskMapperConfig {
 	startProperty: BasesPropertyId | null;
+	/** Optional later start for planning (e.g. a project picked up again); the bar starts here when set. */
+	plannedStartProperty: BasesPropertyId | null;
 	endProperty: BasesPropertyId | null;
 	labelProperty: BasesPropertyId | null;
 	dependenciesProperty: BasesPropertyId | null;
@@ -106,6 +112,7 @@ export function createGroupHeaderTask(
 		custom_class: 'gantt-group-header',
 		filePath: '',
 		hasEnd: true,
+		startsPlanned: false,
 	};
 }
 
@@ -136,10 +143,13 @@ export function mapEntriesToTasks(
 	const tasks: GanttTask[] = [];
 
 	for (const entry of entries) {
-		const startVal = entry.getValue(config.startProperty);
-		const rawStart = extractRawValue(startVal);
-		const startDate = parseObsidianDate(rawStart);
+		const ownStart = parseObsidianDate(extractRawValue(entry.getValue(config.startProperty)));
+		const plannedStart = config.plannedStartProperty
+			? parseObsidianDate(extractRawValue(entry.getValue(config.plannedStartProperty)))
+			: null;
+		const startDate = plannedStart ?? ownStart;
 		if (!startDate) continue;
+		const originalStart = plannedStart && ownStart ? formatDateForGantt(ownStart) : undefined;
 
 		let endDate: Date | null = null;
 		if (config.endProperty) {
@@ -255,6 +265,8 @@ export function mapEntriesToTasks(
 			isMilestone,
 			hasEnd,
 			hue,
+			startsPlanned: plannedStart != null,
+			originalStart,
 		});
 	}
 

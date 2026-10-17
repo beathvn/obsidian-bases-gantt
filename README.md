@@ -75,6 +75,7 @@ The Gantt chart reads frontmatter properties from your notes. Here's what it can
 
 | Property | What it does | Example |
 |----------|-------------|---------|
+| **Planned start** | When you plan to (re)start working on it, e.g. a project you started long ago and pick up again next month. The bar then begins here; the start date stays as the record of when it began. | `plannedStart: 2026-11-02` |
 | **End date** | When the task ends. If omitted, the bar is drawn with a default length (91 days, adjustable in the plugin settings). | `end-date: 2026-03-05` |
 | **Progress** | Completion percentage (0–100). Enables the progress bar on the task. | `progress: 40` |
 | **Dependencies** | Wiki-links to notes that must finish first. Shows arrows between bars. | `depends-on: "[[Design]]"` |
@@ -124,6 +125,7 @@ Click the **gear icon** in the view header to open the Gantt settings panel.
 If auto-detection picks the wrong properties (or you want to override it), you can manually assign each one:
 
 - **Start date** — Which date property to use as the bar's start
+- **Planned start** — Which date property holds a planned (re)start. When a note has one, its bar begins there, and dragging the bar moves the planned start instead of the start date. Defaults to a property named `plannedStart`.
 - **End date** — Which date property to use as the bar's end
 - **Label** — Which property to use as the bar's label (defaults to file name)
 - **Dependencies** — Which property contains dependency links
@@ -139,6 +141,7 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 - **Bar height** — How tall the task bars are (16–60 pixels)
 - **Show progress** — Toggle the progress bar overlay on tasks
 - **Show expected progress** — When progress is shown, adds a dashed line indicating where progress *should* be based on how much time has elapsed
+- **Show original start** — For bars that begin at a planned start, draw a faint dotted line back to the note's own start date
 - **Show details on hover** — Show a popup with the task's dates, progress, dependencies, chosen properties and a preview of the note when you hover over a bar (on by default)
 
 ---
@@ -171,6 +174,7 @@ Creates a new task at that specific date.
 ### Hover over a bar
 Shows a popup with:
 - Date range and duration
+- When the task started, if its bar begins at a planned start
 - Progress bar (if enabled)
 - Dependencies (names of linked tasks)
 - The properties chosen under **Properties on hover** in the plugin settings

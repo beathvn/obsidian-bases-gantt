@@ -163,6 +163,20 @@
 	fill: color-mix(in oklch, var(--interactive-accent), black 20%);
 }
 
+/* From a note's own start to its bar when the bar begins at the planned start. */
+.bases-gantt-view .gantt .bar-wrapper .gantt-original-start {
+	stroke: oklch(from var(--gantt-hue) 0.66 max(c, 0.16) h);
+	stroke-width: 2;
+	stroke-dasharray: 2 4;
+	stroke-linecap: round;
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.bases-gantt-view .gantt .bar-wrapper:not([class*='gantt-color-']):not([style*='--gantt-hue']) .gantt-original-start {
+	stroke: var(--interactive-accent);
+}
+
 /* ── Group header rows ───────────────────────────────────────────── */
 
 .bases-gantt-view .gantt .gantt-group-header .bar {
