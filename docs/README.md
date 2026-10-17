@@ -38,8 +38,8 @@ flowchart LR
 | `main.ts` | Registers the view, commands and settings tab. Owns plugin settings and color assignments. |
 | `gantt-view.ts` | The view: render lifecycle, Frappe options and patches, drags, popup, menus. |
 | `task-mapper.ts` | Pure mapping of Bases entries to Frappe tasks: dates, dependencies, colors, ordering. |
-| `zoom.ts` | Continuous zoom on top of Frappe's fixed view modes, plus date ↔ x math. |
-| `colors.ts` | Which palette colors resemble the user's fixed colors. |
+| `zoom.ts` | Continuous zoom on top of Frappe's fixed view modes, date ↔ x math, and keeping renders cheap (grid window, weekend shading, header labels). |
+| `colors.ts` | Bar shades resolved per color, and which palette colors resemble the user's fixed colors. |
 | `settings.ts` | Settings schema, defaults and the settings tab. |
 | `date-utils.ts` | Parsing Obsidian date values and formatting frontmatter dates. |
 
@@ -50,7 +50,7 @@ flowchart LR
 1. `getTaskMapperConfig()` resolves the properties (configured or auto-detected).
 2. `mapEntriesToTasks()` builds the tasks, per group when the base is grouped.
 3. If the config snapshot is unchanged, the chart is refreshed in place, keeping the scroll position. Otherwise it is rebuilt (`initGantt`).
-4. `afterRender()` adds what Frappe can't draw itself: quarter backdrop, milestones, fixed colors, original-start lines.
+4. `afterRender()` finishes what Frappe draws: it removes Frappe's bar grow animations and adds the quarter backdrop, milestone classes and original-start lines.
 
 Rebuilds are skipped while a bar is being dragged and run once it ends.
 
@@ -58,7 +58,7 @@ Rebuilds are skipped while a bar is being dragged and run once it ends.
 
 Frappe has few extension points, so behavior is changed by replacing methods:
 
-- **Prototype** (once): transitive dependency lookup, bar date math (`compute_start_end_date`), grid date range (`setup_dates`).
+- **Prototype** (once): transitive dependency lookup, bar date math (`compute_start_end_date`), grid date range and window (`setup_dates`), weekend shading (`highlight_holidays`).
 - **Per chart instance**: drag snapping (`get_snap_position`) and popup behavior (`show_popup`, `popup.hide`).
 
 ### Where state lives

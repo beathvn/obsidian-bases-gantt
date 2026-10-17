@@ -23,8 +23,9 @@ sequenceDiagram
     participant F as Frappe
     Input->>Z: zoomBy(factor, pointer x)
     Z->>Z: remember date under pointer (first event per frame)
-    Z->>F: next frame: change_view_mode(band) with new column_width
+    Z->>F: next frame: change_view_mode(band) with new column_width,<br/>grid cut to ~5 viewports
     Z->>F: scrollLeft = x of remembered date − pointer x
+    Z->>F: after 150 ms at rest: render again with the full window
     Z-->>Z: after 400 ms at rest: onSettled (persist)
 ```
 

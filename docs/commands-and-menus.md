@@ -19,8 +19,10 @@ Registered in `main.ts`. Each one acts on the Gantt view in the active leaf, or 
 | Click a bar | Open the note. Ignored if the mouse moved, which counts as a drag. |
 | Right-click a bar | Open note · Open in new tab · Scroll to today |
 | Right-click empty space | Create new task · Scroll to today |
-| Click an empty date column | New note starting (and ending) on that date |
+| Left-click an empty date column | New note starting (and ending) on that date. Only from Week zoom on, where the day under the pointer is highlighted. |
+
+"Scroll to today" in the menus is the same `scrollToToday()` as the command and the Today button. Frappe's own `scroll_current()` fails on iOS.
 
 ## Creating tasks
 
-`createTaskAtToday()` and `createTaskAtDate()` create a note named "New task" through Bases (`createFileForView`), so it lands where the base expects new notes, with the start (and end, if configured) set in its frontmatter. Computed properties are never written.
+`createTaskAtToday()` and `createTaskAtDate()` create a note named "New task" through Bases (`createFileForView`), so it lands where the base expects new notes, with the start (and end, if configured) set in its frontmatter. Computed properties are never written. Frappe reports a date click on mousedown of any button, so the view only acts on a plain left click (`mouseDownIsPrimary`). A right-click or Ctrl+click on macOS opens the menu instead.
