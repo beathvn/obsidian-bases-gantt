@@ -13,10 +13,11 @@ import {
 } from 'obsidian';
 import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
-import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
+import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, GROUP_HEADER_PREFIX, type BarColor, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
 import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll } from './zoom';
 import type BasesGanttPlugin from './main';
+import { slotsResembling } from './colors';
 
 // ── Drag moves the whole dependency chain ──
 // Frappe's get_all_dependent_tasks marks each level as seen before filtering
@@ -435,8 +436,26 @@ export class GanttChartView extends BasesView {
 		return VIEW_MODE_ZOOM[this.config?.get('viewMode') as string] ?? VIEW_MODE_ZOOM.Day;
 	}
 
+	/** Color slots for the values of the color-by property this view currently shows. */
+	private syncColors(property: BasesPropertyId | null): Record<string, number> {
+		if (!property) return {};
+		const values: string[] = [];
+		for (const entry of this.data.data) {
+			const raw = extractRawValue(entry.getValue(property));
+			// Values with a fixed color don't take a palette slot.
+			if (raw != null && !this.plugin.fixedColorFor(String(raw))) values.push(String(raw));
+		}
+		const viewKey = this.getViewKey();
+		// Without a view key (not yet in a leaf) colors are only read and
+		// assigned, never freed, so another view's values are left alone.
+		const fixedColors = this.plugin.settings.valueColors.filter((v) => v.value.trim()).map((v) => v.color);
+		return this.plugin.syncColors(
+			viewKey ? `${viewKey}::${property}` : property, values, viewKey != null, slotsResembling(fixedColors),
+		);
+	}
+
 	/** Identifies this view across reopenings: the base (or note embedding it) plus the view name. */
-	private getScrollStateKey(): string | null {
+	private getViewKey(): string | null {
 		// Cached: by onunload the leaf may already show another file.
 		if (this.scrollStateKey) return this.scrollStateKey;
 		let path: string | undefined;
@@ -456,7 +475,7 @@ export class GanttChartView extends BasesView {
 
 	private getSavedScrollState(): ScrollState | null {
 		if (this.scrollState !== undefined) return this.scrollState;
-		const key = this.getScrollStateKey();
+		const key = this.getViewKey();
 		const state = key ? this.loadScrollStates()[key] : undefined;
 		this.scrollState = state && typeof state.left === 'number' ? state : null;
 		return this.scrollState;
@@ -474,7 +493,7 @@ export class GanttChartView extends BasesView {
 	private saveScrollState(): void {
 		window.clearTimeout(this.scrollSaveTimer);
 		this.scrollSaveTimer = 0;
-		const key = this.getScrollStateKey();
+		const key = this.getViewKey();
 		if (!key || !this.scrollState) return;
 		const states = this.loadScrollStates();
 		// Re-insert so the key order is least recently used first.
@@ -521,6 +540,11 @@ export class GanttChartView extends BasesView {
 		}
 
 		const config = this.getTaskMapperConfig();
+		const colors = this.syncColors(config.colorByProperty);
+		const colorFor = (value: string): BarColor => {
+			const hue = this.plugin.fixedColorFor(value);
+			return hue ? { hue } : { slot: colors[value] ?? 0 };
+		};
 		const newSnapshot = JSON.stringify(config) + '|' + this.getDisplayConfigSnapshot();
 
 		// Build tasks (potentially from grouped data)
@@ -531,7 +555,7 @@ export class GanttChartView extends BasesView {
 			tasks = [];
 			for (let i = 0; i < groups.length; i++) {
 				const group = groups[i];
-				const groupTasks = mapEntriesToTasks(group.entries, config);
+				const groupTasks = mapEntriesToTasks(group.entries, config, colorFor);
 				if (groupTasks.length === 0) continue;
 				const label = group.hasKey() ? String(group.key) : 'Ungrouped';
 				const header = createGroupHeaderTask(label, i, groupTasks);
@@ -539,7 +563,7 @@ export class GanttChartView extends BasesView {
 				tasks.push(...groupTasks);
 			}
 		} else {
-			tasks = mapEntriesToTasks(this.data.data, config);
+			tasks = mapEntriesToTasks(this.data.data, config, colorFor);
 		}
 
 		this.currentTasks = tasks;
@@ -577,7 +601,8 @@ export class GanttChartView extends BasesView {
 		let endProperty = this.config.getAsPropertyId('endDate');
 		let labelProperty = this.config.getAsPropertyId('label');
 		let dependenciesProperty = this.config.getAsPropertyId('dependencies');
-		let colorByProperty = this.config.getAsPropertyId('colorBy');
+		// Never auto-detected: without "Color by" all bars use the accent color.
+		const colorByProperty = this.config.getAsPropertyId('colorBy');
 		let progressProperty = this.config.getAsPropertyId('progress');
 
 		// Auto-detect properties from data when not manually configured.
@@ -588,7 +613,6 @@ export class GanttChartView extends BasesView {
 				startProperty = detected.start;
 				dependenciesProperty = dependenciesProperty ?? detected.dependencies;
 				progressProperty = progressProperty ?? detected.progress;
-				colorByProperty = colorByProperty ?? detected.colorBy;
 			}
 			// The end is also detected when only the start was configured,
 			// but never as the configured start itself.
@@ -617,11 +641,10 @@ export class GanttChartView extends BasesView {
 		end: BasesPropertyId | null;
 		dependencies: BasesPropertyId | null;
 		progress: BasesPropertyId | null;
-		colorBy: BasesPropertyId | null;
 	} {
 		const entries = this.data?.data;
 		if (!entries || entries.length === 0) {
-			return { start: null, end: null, dependencies: null, progress: null, colorBy: null };
+			return { start: null, end: null, dependencies: null, progress: null };
 		}
 
 		// Classify each property by the first entry that has a value for it: a
@@ -695,11 +718,7 @@ export class GanttChartView extends BasesView {
 		const progressKeywords = ['progress', 'percent', 'completion', 'complete', 'done'];
 		const progress = findByKeywords(numberProps, progressKeywords);
 
-		// Color by: look for status/category-like string properties
-		const colorKeywords = ['status', 'priority', 'type', 'category', 'phase', 'stage'];
-		const colorBy = findByKeywords(stringProps, colorKeywords);
-
-		return { start, end, dependencies, progress, colorBy };
+		return { start, end, dependencies, progress };
 	}
 
 	private getDisplayConfigSnapshot(): string {
@@ -849,10 +868,12 @@ export class GanttChartView extends BasesView {
 		// Milestone class can't be combined with the color class in
 		// custom_class: Frappe Gantt throws on spaces in classList.add.
 		for (const task of this.currentTasks) {
-			if (task.isMilestone) {
-				const wrapper = this.ganttEl.querySelector(`.bar-wrapper[data-id="${task.id}"]`);
-				if (wrapper) wrapper.classList.add('gantt-milestone');
-			}
+			if (!task.isMilestone && !task.hue) continue;
+			const wrapper = this.ganttEl.querySelector<HTMLElement>(`.bar-wrapper[data-id="${task.id}"]`);
+			if (!wrapper) continue;
+			if (task.isMilestone) wrapper.classList.add('gantt-milestone');
+			// Same variable the palette classes set, so bars keep the theme's lightness.
+			if (task.hue) wrapper.style.setProperty('--gantt-hue', task.hue);
 		}
 	}
 

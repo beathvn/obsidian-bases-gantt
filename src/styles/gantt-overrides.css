@@ -149,6 +149,20 @@
 	fill: oklch(from var(--gantt-hue) 0.7 max(c, 0.17) h);
 }
 
+/* Bars without a color (no "Color by" value) use the theme's accent as is,
+   Obsidian's purple by default, rather than the normalised palette tone. */
+.bases-gantt-view .gantt .bar-wrapper:not([class*='gantt-color-']):not([style*='--gantt-hue']):not(.gantt-group-header) .bar {
+	fill: var(--interactive-accent);
+}
+
+.bases-gantt-view .gantt .bar-wrapper:not([class*='gantt-color-']):not([style*='--gantt-hue']):not(.gantt-group-header):hover .bar {
+	fill: var(--interactive-accent-hover);
+}
+
+.bases-gantt-view .gantt .bar-wrapper:not([class*='gantt-color-']):not([style*='--gantt-hue']):not(.gantt-group-header) .bar-progress {
+	fill: color-mix(in oklch, var(--interactive-accent), black 20%);
+}
+
 /* ── Group header rows ───────────────────────────────────────────── */
 
 .bases-gantt-view .gantt .gantt-group-header .bar {

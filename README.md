@@ -89,7 +89,6 @@ You don't have to use the exact names above. The plugin auto-detects properties 
 - **End date:** `end`, `due`, `finish`, `deadline`, `until`
 - **Progress:** `progress`, `percent`, `completion`, `complete`, `done`
 - **Dependencies:** `depends`, `blocks`, `after`, `prerequisite`, `requires`
-- **Color by:** `status`, `priority`, `type`, `category`, `phase`, `stage`
 
 So `due-date`, `deadline`, `finish-date`, etc. all work as end dates without any configuration.
 
@@ -128,7 +127,7 @@ If auto-detection picks the wrong properties (or you want to override it), you c
 - **End date** — Which date property to use as the bar's end
 - **Label** — Which property to use as the bar's label (defaults to file name)
 - **Dependencies** — Which property contains dependency links
-- **Color by** — Which property to color-code bars by (e.g., `status` gives each status value a different color)
+- **Color by** — Which property to color-code bars by (e.g., `status` gives each status value a different color). Without it, all bars use your theme's accent color.
 - **Progress** — Which numeric property represents completion (only visible when "Show progress" is on)
 
 ### Zooming
@@ -192,6 +191,7 @@ Under **Settings → Community plugins → Bases Gantt**:
 
 - **Move dependent tasks along** — When you drag a task, shift every task that depends on it by the same amount. Turn off to keep dependent tasks fixed in place.
 - **Default length without end date** — How many days a task without an end date is drawn (default 91).
+- **Value colors** — Give specific values of the **Color by** property a fixed color (e.g. `done` → green). Matching ignores case. Values not listed here get a color automatically, which they keep while the value is in use, so adding new values never recolors existing bars. Automatic colors skip any palette color that looks like one you fixed.
 
 ---
 

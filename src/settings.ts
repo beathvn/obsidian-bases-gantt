@@ -7,11 +7,27 @@ export interface BasesGanttSettings {
 	moveDependentTasks: boolean;
 	/** How many days a task without an end date is drawn. */
 	defaultDurationDays: number;
+	/**
+	 * Color slot per shown value of the color-by property, per view
+	 * ("Projects.base::Gantt::note.status" → "done" → 2), so adding a value
+	 * never recolors others. A value no longer shown frees its slot.
+	 */
+	colorAssignments: Record<string, Record<string, number>>;
+	/** Colors fixed for specific values of the color-by property; other values use the palette. */
+	valueColors: ValueColor[];
+}
+
+export interface ValueColor {
+	value: string;
+	/** CSS color, e.g. "#2e9e44". */
+	color: string;
 }
 
 export const DEFAULT_SETTINGS: BasesGanttSettings = {
 	moveDependentTasks: true,
 	defaultDurationDays: 91,
+	colorAssignments: {},
+	valueColors: [],
 };
 
 export class BasesGanttSettingTab extends PluginSettingTab {
@@ -55,5 +71,51 @@ export class BasesGanttSettingTab extends PluginSettingTab {
 						for (const view of GanttChartView.instances) view.onDataUpdated();
 					});
 			});
+
+		new Setting(containerEl)
+			.setName('Value colors')
+			.setDesc('Give specific values of the "Color by" property a fixed color (matched ignoring case). Values not listed here get a color automatically.')
+			.setHeading();
+
+		const valueColors = this.plugin.settings.valueColors;
+		for (const entry of valueColors) {
+			const row = new Setting(containerEl)
+				.addColorPicker((picker) => picker
+					.setValue(entry.color)
+					.onChange(async (color) => {
+						entry.color = color;
+						await this.saveAndRefresh();
+					}))
+				.addText((text) => text
+					.setPlaceholder('Value, e.g. done')
+					.setValue(entry.value)
+					.onChange(async (value) => {
+						entry.value = value;
+						await this.saveAndRefresh();
+					}))
+				.addExtraButton((button) => button
+					.setIcon('trash-2')
+					.setTooltip('Remove')
+					.onClick(async () => {
+						valueColors.splice(valueColors.indexOf(entry), 1);
+						await this.saveAndRefresh();
+						this.display();
+					}));
+			row.settingEl.addClass('bases-gantt-value-color');
+		}
+
+		new Setting(containerEl)
+			.addButton((button) => button
+				.setButtonText('Add value')
+				.onClick(async () => {
+					valueColors.push({ value: '', color: '#3b82f6' });
+					await this.plugin.saveSettings();
+					this.display();
+				}));
+	}
+
+	private async saveAndRefresh(): Promise<void> {
+		await this.plugin.saveSettings();
+		for (const view of GanttChartView.instances) view.onDataUpdated();
 	}
 }

@@ -15,6 +15,8 @@ export interface GanttTask extends FrappeTask {
 	isMilestone?: boolean;
 	/** False when the note has no end date and `end` is the display default. */
 	hasEnd: boolean;
+	/** Color the user fixed for this task's color-by value, instead of a palette class. */
+	hue?: string;
 }
 
 /** Configuration for mapping entries to tasks, derived from view options. */
@@ -31,14 +33,18 @@ export interface TaskMapperConfig {
 }
 
 /** Color class palette — maps to CSS classes gantt-color-0 through gantt-color-7. */
-const COLOR_CLASS_COUNT = 8;
+export const COLOR_CLASS_COUNT = 8;
+
+/** A value's bar color: a palette slot (0 … COLOR_CLASS_COUNT-1) or a color fixed in the settings. */
+export type BarColor = { slot: number } | { hue: string };
+export type ColorFor = (value: string) => BarColor;
 
 /**
  * Extract a string representation from an Obsidian Value object.
  * Returns null for NullValue or null/undefined inputs.
  * DateValue gets special handling: dateOnly() strips time for clean date strings.
  */
-function extractRawValue(val: Value | null): string | null {
+export function extractRawValue(val: Value | null): string | null {
 	if (val == null || val instanceof NullValue) return null;
 	if (val instanceof DateValue) {
 		return val.dateOnly().toString();
@@ -106,6 +112,7 @@ export function createGroupHeaderTask(
 export function mapEntriesToTasks(
 	entries: BasesEntry[],
 	config: TaskMapperConfig,
+	colorFor: ColorFor,
 ): GanttTask[] {
 	if (!config.startProperty) return [];
 
@@ -121,18 +128,6 @@ export function mapEntriesToTasks(
 		// Path without extension, e.g. "projects/Task A"
 		const pathNoExt = entry.file.path.replace(/\.[^.]+$/, '');
 		nameToId.set(pathNoExt, id);
-	}
-
-	// Collect unique values for color mapping
-	const colorValues = new Map<string, number>();
-	if (config.colorByProperty) {
-		for (const entry of entries) {
-			const val = entry.getValue(config.colorByProperty);
-			const raw = extractRawValue(val);
-			if (raw != null && !colorValues.has(String(raw))) {
-				colorValues.set(String(raw), colorValues.size % COLOR_CLASS_COUNT);
-			}
-		}
 	}
 
 	const tasks: GanttTask[] = [];
@@ -219,14 +214,14 @@ export function mapEntriesToTasks(
 
 		// Color class
 		let custom_class = '';
+		let hue: string | undefined;
 		if (config.colorByProperty) {
 			const colorVal = entry.getValue(config.colorByProperty);
 			const raw = extractRawValue(colorVal);
 			if (raw != null) {
-				const idx = colorValues.get(String(raw));
-				if (idx !== undefined) {
-					custom_class = `gantt-color-${idx}`;
-				}
+				const color = colorFor(String(raw));
+				if ('hue' in color) hue = color.hue;
+				else custom_class = `gantt-color-${color.slot}`;
 			}
 		}
 
@@ -256,6 +251,7 @@ export function mapEntriesToTasks(
 			filePath: entry.file.path,
 			isMilestone,
 			hasEnd,
+			hue,
 		});
 	}
 
