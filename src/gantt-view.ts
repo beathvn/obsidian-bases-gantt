@@ -15,7 +15,7 @@ import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
-import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll } from './zoom';
+import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll } from './zoom';
 import type BasesGanttPlugin from './main';
 
 // ── Drag moves the whole dependency chain ──
@@ -47,7 +47,8 @@ ganttDeps.get_all_dependent_tasks = function (this: typeof ganttDeps, taskId: st
 // the count. That truncates float noise in Week view (Saturday → Friday)
 // and, in Month/Year view, whole months/years: every drag snaps the start
 // to the 1st and collapses short tasks. Instead, shift the pre-drag dates
-// by how far each edge moved, in whole days. Frappe positions a bar's start
+// by how far each edge moved, in whole days (whole weeks when zoomed out
+// past days, see dragSnapDays). Frappe positions a bar's start
 // with a calendar mapping (day D of a month at D/31 of its column) but sizes
 // it with 30-day months, so the start shift follows the mapping and a
 // resized end follows the width math; that way the redrawn bar lands where
@@ -93,14 +94,36 @@ function patchBarDateMath(gantt: Gantt): void {
 		const width = bar.getWidth();
 		const startMoved = Math.abs(x - ox) > 0.5;
 		const endMoved = Math.abs(x + width - ox - owidth) > 0.5;
-		const startShift = startMoved ? dayShiftForX(this.gantt, this.dragOrigin.start, x - ox) : 0;
-		const endShift = endMoved ? startShift + Math.round((width - owidth) / pxPerDay) : 0;
+		const snap = dragSnapDays(pxPerDay);
+		const toSnap = (days: number): number => Math.round(days / snap) * snap;
+		const startShift = startMoved ? toSnap(dayShiftForX(this.gantt, this.dragOrigin.start, x - ox)) : 0;
+		const endShift = endMoved ? startShift + toSnap((width - owidth) / pxPerDay) : 0;
 		return {
 			new_start_date: addDays(this.dragOrigin.start, startShift),
 			new_end_date: addDays(this.dragOrigin.end, endShift),
 		};
 	};
 	barDateMathPatched = true;
+}
+
+/**
+ * Snap the bar under the mouse to whole weeks when zoomed out past days
+ * (Frappe's snap_at is fixed per chart, but the zoom changes live).
+ */
+function patchDragSnap(gantt: Gantt): void {
+	const g = gantt as unknown as {
+		config: { column_width: number; step: number; unit: string };
+		get_snap_position(dx: number, ox: number): number;
+	};
+	const original = g.get_snap_position.bind(g);
+	g.get_snap_position = (dx, ox) => {
+		const { column_width, step, unit } = g.config;
+		const pxPerDay = column_width / (step * DAYS_PER_UNIT[unit]);
+		const snap = dragSnapDays(pxPerDay);
+		if (snap === 1) return original(dx, ox);
+		const pxPerSnap = snap * pxPerDay;
+		return Math.round(dx / pxPerSnap) * pxPerSnap;
+	};
 }
 
 /** One file's prior frontmatter values, so a drag-caused write can be reverted. */
@@ -783,6 +806,7 @@ export class GanttChartView extends BasesView {
 			const create = (): Gantt => withCachedDateFormats(() => new Gantt(this.ganttEl, tasks, options));
 			this.gantt = savedScroll ? withoutInitialScroll(create) : create();
 			patchBarDateMath(this.gantt);
+			patchDragSnap(this.gantt);
 		} catch (e) {
 			console.error('Bases Gantt: failed to initialize chart', e);
 			this.ganttEl.empty();

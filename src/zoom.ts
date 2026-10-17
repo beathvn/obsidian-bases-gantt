@@ -63,6 +63,11 @@ function bandFor(pxPerDay: number): ZoomBand {
 	return band;
 }
 
+/** Drags move in whole days while the grid shows days (Day zoom and finer), otherwise in whole weeks. */
+export function dragSnapDays(pxPerDay: number): number {
+	return bandFor(pxPerDay).daysPerColumn <= 1 ? 1 : 7;
+}
+
 // ── View modes with width-aware labels ──
 
 type LabelFn = (d: Date, ld: Date | null, lang: string) => string;
