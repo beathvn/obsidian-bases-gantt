@@ -99,9 +99,45 @@ function monthName(d: Date, lang: string, style: 'long' | 'short'): string {
 	return fmt.format(d);
 }
 
+// Frappe's lower header labels are 12px and get 80% of the column; today's
+// label is bold and sits in a padded pill, so measure for that, the widest case.
+const LABEL_SHARE = 0.8;
+const LABEL_PILL_PADDING = 12;
+let measureCtx: CanvasRenderingContext2D | null = null;
+const labelWidths = new Map<string, number>();
+
+function labelWidth(text: string): number {
+	const family = getComputedStyle(document.body).getPropertyValue('--font-interface').trim() || 'sans-serif';
+	const font = `700 12px ${family}`;
+	const key = `${font}|${text}`;
+	let width = labelWidths.get(key);
+	if (width === undefined) {
+		measureCtx ??= document.createElement('canvas').getContext('2d');
+		if (!measureCtx) return 0;
+		measureCtx.font = font;
+		width = measureCtx.measureText(text).width;
+		labelWidths.set(key, width);
+	}
+	return width;
+}
+
+/**
+ * Index of the first (most detailed) label format that fits a column of
+ * this width, judged by each format's widest sample, so every column at a
+ * zoom level gets the same format. Else the last format.
+ */
+function fittingFormat(columnWidth: number, widestSamples: string[]): number {
+	const room = columnWidth * LABEL_SHARE - LABEL_PILL_PADDING;
+	const index = widestSamples.findIndex((label) => labelWidth(label) <= room);
+	return index >= 0 ? index : widestSamples.length - 1;
+}
+
+/** A week spanning two months, with the longest numbers: the widest week labels. */
+const WIDE_WEEK = new Date(2026, 8, 28);
+
 /**
  * Per-chart copies of Frappe's view modes whose lower header labels shrink
- * with the column width. Labels must never be empty: Frappe skips empty ones,
+ * to what fits the column width (measured, so in any font and language). Labels must never be empty: Frappe skips empty ones,
  * and click-to-create maps a click to a label by column index.
  */
 function createViewModes(getPxPerDay: () => number): FrappeViewMode[] {
@@ -109,18 +145,29 @@ function createViewModes(getPxPerDay: () => number): FrappeViewMode[] {
 		{ ...BASE_MODES.YEAR },
 		{
 			...BASE_MODES.MONTH,
-			lower_text: (d, _ld, lang) =>
-				monthName(d, lang, getPxPerDay() * 30 >= 80 ? 'long' : 'short'),
+			lower_text: (d, _ld, lang) => {
+				const longest = (style: 'long' | 'short') => Array.from({ length: 12 }, (_, m) => monthName(new Date(2026, m, 1), lang, style))
+					.reduce((a, b) => (labelWidth(b) > labelWidth(a) ? b : a));
+				const format = fittingFormat(getPxPerDay() * 30, [longest('long'), longest('short')]);
+				return monthName(d, lang, format === 0 ? 'long' : 'short');
+			},
 		},
 		{
 			...BASE_MODES.WEEK,
 			lower_text: (d, ld, lang) => {
-				const width = getPxPerDay() * 7;
+				const format = fittingFormat(getPxPerDay() * 7, [
+					`W52 · ${formatWeekRange(WIDE_WEEK, null, lang)}`,
+					`W52 · 28 ${monthName(WIDE_WEEK, lang, 'short')}`,
+					'W52',
+					'52',
+				]);
 				const week = getISOWeekNumber(d);
-				if (width >= 130) return `W${week} · ${formatWeekRange(d, ld, lang)}`;
-				if (width >= 80) return `W${week} · ${d.getDate()} ${monthName(d, lang, 'short')}`;
-				if (width >= 40) return `W${week}`;
-				return String(week);
+				return [
+					`W${week} · ${formatWeekRange(d, ld, lang)}`,
+					`W${week} · ${d.getDate()} ${monthName(d, lang, 'short')}`,
+					`W${week}`,
+					String(week),
+				][format];
 			},
 		},
 		{ ...BASE_MODES.DAY },
