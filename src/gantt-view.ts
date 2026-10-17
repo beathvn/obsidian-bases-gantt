@@ -17,7 +17,7 @@ import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, 
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
 import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll } from './zoom';
 import type BasesGanttPlugin from './main';
-import { slotsResembling } from './colors';
+import { PALETTE_VARS, barShades, setBarShades, slotsResembling, type BarShades } from './colors';
 
 // ── Drag moves the whole dependency chain ──
 // Frappe's get_all_dependent_tasks marks each level as seen before filtering
@@ -326,6 +326,8 @@ export class GanttChartView extends BasesView {
 	private static readonly SCROLL_SAVE_MS = 500;
 	/** Longest note body rendered in the hover popup's scrollable preview. */
 	private static readonly PREVIEW_MAX_CHARS = 5000;
+	private readonly shadeCache = new Map<string, BarShades>();
+	private fixedColorStyle: HTMLStyleElement | null = null;
 	/** Task the hover popup was last filled for, so a late preview of another note is dropped. */
 	private popupTaskId: string | null = null;
 
@@ -338,6 +340,13 @@ export class GanttChartView extends BasesView {
 		GanttChartView.instances.add(this);
 		this.containerEl.addClass('bases-gantt-view');
 		this.ganttEl = this.containerEl.createDiv({ cls: 'gantt-wrapper' });
+		this.resolvePalette();
+		// The palette follows the theme's --color-* values.
+		this.registerEvent(this.app.workspace.on('css-change', () => {
+			this.shadeCache.clear();
+			this.resolvePalette();
+			this.updateFixedColorStyles();
+		}));
 		this.registerContextMenu();
 		this.zoom = new ZoomController(
 			this.getStoredZoom(),
@@ -536,7 +545,7 @@ export class GanttChartView extends BasesView {
 		for (const entry of this.data.data) {
 			const raw = extractRawValue(entry.getValue(property));
 			// Values with a fixed color don't take a palette slot.
-			if (raw != null && !this.plugin.fixedColorFor(String(raw))) values.push(String(raw));
+			if (raw != null && this.plugin.fixedColorIndex(String(raw)) < 0) values.push(String(raw));
 		}
 		const viewKey = this.getViewKey();
 		// Without a view key (not yet in a leaf) colors are only read and
@@ -634,9 +643,10 @@ export class GanttChartView extends BasesView {
 
 		const config = this.getTaskMapperConfig();
 		const colors = this.syncColors(config.colorByProperty);
+		this.updateFixedColorStyles();
 		const colorFor = (value: string): BarColor => {
-			const hue = this.plugin.fixedColorFor(value);
-			return hue ? { hue } : { slot: colors[value] ?? 0 };
+			const fixed = this.plugin.fixedColorIndex(value);
+			return fixed >= 0 ? { fixed } : { slot: colors[value] ?? 0 };
 		};
 		const newSnapshot = JSON.stringify(config) + '|' + this.getDisplayConfigSnapshot();
 
@@ -975,12 +985,8 @@ export class GanttChartView extends BasesView {
 		// custom_class: Frappe Gantt throws on spaces in classList.add.
 		for (const task of this.currentTasks) {
 			if (task.originalStart && showOriginalStart) this.drawOriginalStart(task);
-			if (!task.isMilestone && !task.hue) continue;
-			const wrapper = this.ganttEl.querySelector<HTMLElement>(`.bar-wrapper[data-id="${task.id}"]`);
-			if (!wrapper) continue;
-			if (task.isMilestone) wrapper.classList.add('gantt-milestone');
-			// Same variable the palette classes set, so bars keep the theme's lightness.
-			if (task.hue) wrapper.style.setProperty('--gantt-hue', task.hue);
+			if (!task.isMilestone) continue;
+			this.ganttEl.querySelector(`.bar-wrapper[data-id="${task.id}"]`)?.classList.add('gantt-milestone');
 		}
 	}
 
@@ -1076,6 +1082,44 @@ export class GanttChartView extends BasesView {
 			);
 		}
 		return rows.length > 0 ? `<div class="gantt-popup-props">${rows.join('')}</div>` : null;
+	}
+
+	/** Resolve the palette's bar shades into --gantt-palette-N-* on the view, which the gantt-color-N classes read. */
+	private resolvePalette(): void {
+		PALETTE_VARS.forEach((variable, slot) => {
+			setBarShades(this.containerEl, this.shadesFor(`var(${variable})`), `--gantt-palette-${slot}`);
+		});
+	}
+
+	/**
+	 * CSS rules giving each "Value colors" entry a class, gantt-fixed-N, like
+	 * the palette's gantt-color-N. A class comes with the bar when Frappe
+	 * creates it; shades set inline on bars afterwards were lost on iOS while
+	 * pinch-zooming re-rendered the chart.
+	 */
+	private updateFixedColorStyles(): void {
+		const rules = this.plugin.settings.valueColors.map(({ color }, index) => {
+			if (!color) return '';
+			const { fill, progress, hover } = this.shadesFor(color);
+			return `.bases-gantt-view .gantt .bar-wrapper.gantt-fixed-${index} `
+				+ `{ --gantt-fill: ${fill}; --gantt-progress: ${progress}; --gantt-hover: ${hover}; }`;
+		}).join('\n');
+		if (!this.fixedColorStyle?.isConnected) this.fixedColorStyle = this.containerEl.createEl('style');
+		if (this.fixedColorStyle.textContent !== rules) this.fixedColorStyle.textContent = rules;
+	}
+
+	/** Bar shades of a color, computed once per color (and theme). */
+	private shadesFor(cssColor: string): BarShades {
+		let shades = this.shadeCache.get(cssColor);
+		if (!shades) {
+			// Inside the view, so theme variables resolve as they do for the bars.
+			const probe = this.containerEl.createDiv();
+			probe.style.display = 'none';
+			shades = barShades(probe, cssColor);
+			probe.remove();
+			this.shadeCache.set(cssColor, shades);
+		}
+		return shades;
 	}
 
 	/** A faint line from the note's own start to its bar, which begins at the planned start. */

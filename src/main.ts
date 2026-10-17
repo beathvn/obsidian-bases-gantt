@@ -167,11 +167,14 @@ export default class BasesGanttPlugin extends Plugin {
 		return assigned;
 	}
 
-	/** The color fixed in the settings for a color-by value (matched ignoring case and surrounding spaces). */
-	fixedColorFor(value: string): string | undefined {
+	/**
+	 * Index in the "Value colors" setting of the color fixed for a color-by
+	 * value (matched ignoring case and surrounding spaces), or -1.
+	 */
+	fixedColorIndex(value: string): number {
 		const wanted = value.trim().toLowerCase();
-		if (!wanted) return undefined;
-		return this.settings.valueColors.find((v) => v.value.trim().toLowerCase() === wanted)?.color;
+		if (!wanted) return -1;
+		return this.settings.valueColors.findIndex((v) => v.value.trim().toLowerCase() === wanted);
 	}
 
 	onunload() {

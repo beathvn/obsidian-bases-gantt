@@ -18,9 +18,9 @@ flowchart LR
     P -->|value → slot| V
     P -.->|debounced save| D[(data.json<br/>colorAssignments)]
     V -->|colorFor| M[task-mapper]
-    M -->|class gantt-color-N<br/>or hue| R[afterRender]
+    M -->|class gantt-color-N<br/>or gantt-fixed-N| R[Frappe bars]
 ```
 
 - **Scope:** assignments are stored per view and property (`<base path>::<view name>::note.status`), so two bases with the same property don't free each other's colors.
 - **Similar colors:** `slotsResembling()` resolves the theme's `--color-*` variables and the fixed colors to hues. A slot within 30° of a fixed color is blocked. If every slot is blocked, all are allowed again.
-- **Drawing:** a palette slot is a CSS class (`gantt-color-N`). A fixed color sets `--gantt-hue` inline on the bar (Frappe allows only one class). Both go through the same CSS formula, which sets one lightness for every hue so white labels stay readable. Bars without a color use `--interactive-accent` as is.
+- **Drawing:** every color is a CSS class that Frappe puts on the bar when it creates it: `gantt-color-N` for palette slots, `gantt-fixed-N` for "Value colors" entries (rules generated per view). Shades set on bars afterwards were lost on iOS while pinch-zooming re-rendered the chart. Each hue is brought to one lightness so white labels stay readable. `barShades()` resolves these shades to plain colors once per color and theme (again on `css-change`). Bars without a color use `--interactive-accent` as is.

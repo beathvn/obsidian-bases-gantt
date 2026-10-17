@@ -15,8 +15,6 @@ export interface GanttTask extends FrappeTask {
 	isMilestone?: boolean;
 	/** False when the note has no end date and `end` is the display default. */
 	hasEnd: boolean;
-	/** Color the user fixed for this task's color-by value, instead of a palette class. */
-	hue?: string;
 	/** The bar starts at the note's planned start, so drags move that and leave the start date alone. */
 	startsPlanned: boolean;
 	/** With a planned start: the note's own start date (YYYY-MM-DD), kept for display. */
@@ -41,8 +39,11 @@ export interface TaskMapperConfig {
 /** Color class palette — maps to CSS classes gantt-color-0 through gantt-color-7. */
 export const COLOR_CLASS_COUNT = 8;
 
-/** A value's bar color: a palette slot (0 … COLOR_CLASS_COUNT-1) or a color fixed in the settings. */
-export type BarColor = { slot: number } | { hue: string };
+/**
+ * A value's bar color: a palette slot (0 … COLOR_CLASS_COUNT-1), or the
+ * index of a color fixed in the settings. Both become a CSS class.
+ */
+export type BarColor = { slot: number } | { fixed: number };
 export type ColorFor = (value: string) => BarColor;
 
 /**
@@ -227,14 +228,12 @@ export function mapEntriesToTasks(
 
 		// Color class
 		let custom_class = '';
-		let hue: string | undefined;
 		if (config.colorByProperty) {
 			const colorVal = entry.getValue(config.colorByProperty);
 			const raw = extractRawValue(colorVal);
 			if (raw != null) {
 				const color = colorFor(String(raw));
-				if ('hue' in color) hue = color.hue;
-				else custom_class = `gantt-color-${color.slot}`;
+				custom_class = 'fixed' in color ? `gantt-fixed-${color.fixed}` : `gantt-color-${color.slot}`;
 			}
 		}
 
@@ -264,7 +263,6 @@ export function mapEntriesToTasks(
 			filePath: entry.file.path,
 			isMilestone,
 			hasEnd,
-			hue,
 			startsPlanned: plannedStart != null,
 			originalStart,
 		});

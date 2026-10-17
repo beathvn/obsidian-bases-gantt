@@ -2,7 +2,7 @@
  * Theme colors behind the palette classes gantt-color-0 … 7, in slot order
  * (keep in sync with styles/gantt-overrides.css).
  */
-const PALETTE_VARS = [
+export const PALETTE_VARS = [
 	'--color-blue', '--color-green', '--color-orange', '--color-red',
 	'--color-purple', '--color-yellow', '--color-cyan', '--color-pink',
 ];
@@ -61,4 +61,46 @@ export function slotsResembling(colors: string[]): Set<number> {
 		probe.remove();
 	}
 	return blocked;
+}
+
+/**
+ * Bars are drawn with every hue at the same lightness and a minimum chroma,
+ * so the palette looks equally vivid in any theme and white labels stay
+ * readable (yellow included); progress is a step deeper, hover a step lighter.
+ */
+const SHADES = {
+	fill: 'oklch(from {c} 0.66 max(c, 0.16) h)',
+	progress: 'oklch(from {c} 0.56 max(c, 0.16) h)',
+	hover: 'oklch(from {c} 0.7 max(c, 0.17) h)',
+};
+
+export type BarShades = Record<keyof typeof SHADES, string>;
+
+/**
+ * The bar shades of a CSS color, resolved to plain color values once per
+ * color and theme, rather than by CSS on every bar of every render (each
+ * frame while zooming). Without relative color support the color itself is
+ * used.
+ */
+export function barShades(probe: HTMLElement, cssColor: string): BarShades {
+	// With var() in it, an unsupported expression would still be accepted
+	// and only fail when computed, so check support up front.
+	const supported = CSS.supports('color', 'oklch(from red l c h)');
+	const resolve = (expression: string): string => {
+		if (!supported) return cssColor;
+		probe.style.color = expression;
+		return getComputedStyle(probe).color;
+	};
+	return {
+		fill: resolve(SHADES.fill.replace('{c}', cssColor)),
+		progress: resolve(SHADES.progress.replace('{c}', cssColor)),
+		hover: resolve(SHADES.hover.replace('{c}', cssColor)),
+	};
+}
+
+/** Set a bar's shades as the CSS variables the bar styles read. */
+export function setBarShades(el: HTMLElement | SVGElement, shades: BarShades, prefix = '--gantt'): void {
+	el.style.setProperty(`${prefix}-fill`, shades.fill);
+	el.style.setProperty(`${prefix}-progress`, shades.progress);
+	el.style.setProperty(`${prefix}-hover`, shades.hover);
 }

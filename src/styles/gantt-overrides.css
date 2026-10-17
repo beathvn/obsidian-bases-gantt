@@ -106,33 +106,67 @@
 
 /* ── Bar colors ──────────────────────────────────────────────────── */
 
-/* Every hue is normalised to the same lightness and a minimum chroma, so
-   the palette looks equally vivid whatever the theme's --color-* values
-   are and white labels stay readable on all of them (yellow included).
-   Progress is the same hue a step deeper.
-   Bars without a "Color by" value use the accent; every value gets its own
-   hue that differs from it, so the first value never looks uncolored. */
+/* Bars read their shades from --gantt-fill / -progress / -hover. Palette
+   slots and fixed value colors get theirs resolved by script (colors.ts:
+   barShades), as plain colors: the view sets --gantt-palette-N-* on its
+   container, and fixed colors are set inline on the bar. Bars without a
+   "Color by" value use the theme's accent as is (Obsidian's purple by
+   default); every palette hue differs from it. */
 .bases-gantt-view .gantt .bar-wrapper {
-	--gantt-hue: var(--interactive-accent);
+	--gantt-fill: var(--interactive-accent);
+	--gantt-hover: var(--interactive-accent-hover);
+	--gantt-progress: color-mix(in oklch, var(--interactive-accent), black 20%);
 }
 
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-0 { --gantt-hue: var(--color-blue); }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-1 { --gantt-hue: var(--color-green); }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-2 { --gantt-hue: var(--color-orange); }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-3 { --gantt-hue: var(--color-red); }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-4 { --gantt-hue: var(--color-purple); }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-5 { --gantt-hue: var(--color-yellow); }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-6 { --gantt-hue: var(--color-cyan); }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-7 { --gantt-hue: var(--color-pink); }
+.bases-gantt-view .gantt .bar-wrapper.gantt-color-0 {
+	--gantt-fill: var(--gantt-palette-0-fill);
+	--gantt-hover: var(--gantt-palette-0-hover);
+	--gantt-progress: var(--gantt-palette-0-progress);
+}
+.bases-gantt-view .gantt .bar-wrapper.gantt-color-1 {
+	--gantt-fill: var(--gantt-palette-1-fill);
+	--gantt-hover: var(--gantt-palette-1-hover);
+	--gantt-progress: var(--gantt-palette-1-progress);
+}
+.bases-gantt-view .gantt .bar-wrapper.gantt-color-2 {
+	--gantt-fill: var(--gantt-palette-2-fill);
+	--gantt-hover: var(--gantt-palette-2-hover);
+	--gantt-progress: var(--gantt-palette-2-progress);
+}
+.bases-gantt-view .gantt .bar-wrapper.gantt-color-3 {
+	--gantt-fill: var(--gantt-palette-3-fill);
+	--gantt-hover: var(--gantt-palette-3-hover);
+	--gantt-progress: var(--gantt-palette-3-progress);
+}
+.bases-gantt-view .gantt .bar-wrapper.gantt-color-4 {
+	--gantt-fill: var(--gantt-palette-4-fill);
+	--gantt-hover: var(--gantt-palette-4-hover);
+	--gantt-progress: var(--gantt-palette-4-progress);
+}
+.bases-gantt-view .gantt .bar-wrapper.gantt-color-5 {
+	--gantt-fill: var(--gantt-palette-5-fill);
+	--gantt-hover: var(--gantt-palette-5-hover);
+	--gantt-progress: var(--gantt-palette-5-progress);
+}
+.bases-gantt-view .gantt .bar-wrapper.gantt-color-6 {
+	--gantt-fill: var(--gantt-palette-6-fill);
+	--gantt-hover: var(--gantt-palette-6-hover);
+	--gantt-progress: var(--gantt-palette-6-progress);
+}
+.bases-gantt-view .gantt .bar-wrapper.gantt-color-7 {
+	--gantt-fill: var(--gantt-palette-7-fill);
+	--gantt-hover: var(--gantt-palette-7-hover);
+	--gantt-progress: var(--gantt-palette-7-progress);
+}
 
 .bases-gantt-view .gantt .bar-wrapper .bar {
-	fill: oklch(from var(--gantt-hue) 0.66 max(c, 0.16) h);
+	fill: var(--gantt-fill);
 	stroke: none;
 	outline: none;
 }
 
 .bases-gantt-view .gantt .bar-wrapper .bar-progress {
-	fill: oklch(from var(--gantt-hue) 0.56 max(c, 0.16) h);
+	fill: var(--gantt-progress);
 }
 
 .bases-gantt-view .gantt .bar-wrapper:not(.gantt-group-header) .bar-label:not(.big) {
@@ -146,35 +180,17 @@
 }
 
 .bases-gantt-view .gantt .bar-wrapper:not(.gantt-group-header):hover .bar {
-	fill: oklch(from var(--gantt-hue) 0.7 max(c, 0.17) h);
-}
-
-/* Bars without a color (no "Color by" value) use the theme's accent as is,
-   Obsidian's purple by default, rather than the normalised palette tone. */
-.bases-gantt-view .gantt .bar-wrapper:not([class*='gantt-color-']):not([style*='--gantt-hue']):not(.gantt-group-header) .bar {
-	fill: var(--interactive-accent);
-}
-
-.bases-gantt-view .gantt .bar-wrapper:not([class*='gantt-color-']):not([style*='--gantt-hue']):not(.gantt-group-header):hover .bar {
-	fill: var(--interactive-accent-hover);
-}
-
-.bases-gantt-view .gantt .bar-wrapper:not([class*='gantt-color-']):not([style*='--gantt-hue']):not(.gantt-group-header) .bar-progress {
-	fill: color-mix(in oklch, var(--interactive-accent), black 20%);
+	fill: var(--gantt-hover);
 }
 
 /* From a note's own start to its bar when the bar begins at the planned start. */
 .bases-gantt-view .gantt .bar-wrapper .gantt-original-start {
-	stroke: oklch(from var(--gantt-hue) 0.66 max(c, 0.16) h);
+	stroke: var(--gantt-fill);
 	stroke-width: 2;
 	stroke-dasharray: 2 4;
 	stroke-linecap: round;
 	opacity: 0.5;
 	pointer-events: none;
-}
-
-.bases-gantt-view .gantt .bar-wrapper:not([class*='gantt-color-']):not([style*='--gantt-hue']) .gantt-original-start {
-	stroke: var(--interactive-accent);
 }
 
 /* ── Group header rows ───────────────────────────────────────────── */
