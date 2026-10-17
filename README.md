@@ -343,6 +343,8 @@ npm run dev    # watch mode with source maps
 npm run build  # production build
 ```
 
+How it works is documented in [docs/](docs/README.md): an architecture overview, plus one page per feature on what it does and how it is built.
+
 ---
 
 ## License
