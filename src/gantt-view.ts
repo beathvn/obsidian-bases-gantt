@@ -296,6 +296,8 @@ export class GanttChartView extends BasesView {
 	private isDragging = false;
 	/** Where the current mouse gesture on the chart started. */
 	private mouseDownPos: { x: number; y: number } | null = null;
+	/** The last mousedown in the chart was a plain left click. */
+	private mouseDownIsPrimary = true;
 	/**
 	 * Set on mouseup when the pointer moved since mousedown. Frappe fires a
 	 * plain DOM click on the bar after any release, including a drag that
@@ -377,6 +379,9 @@ export class GanttChartView extends BasesView {
 		}, true);
 		this.registerDomEvent(this.ganttEl, 'mousedown', (evt) => {
 			this.mouseDownPos = { x: evt.clientX, y: evt.clientY };
+			// Frappe reports a click on a date column on mousedown of any button,
+			// and Ctrl+click is a right-click on macOS: only a plain left click creates a task.
+			this.mouseDownIsPrimary = evt.button === 0 && !evt.ctrlKey;
 		}, true);
 		// Bubble phase on document, so Frappe's own mouseup handler on the
 		// SVG (which fires the final on_date_change) has already run, and
@@ -937,7 +942,7 @@ export class GanttChartView extends BasesView {
 			},
 
 			on_date_click: (dateStr: string) => {
-				this.createTaskAtDate(dateStr);
+				if (this.mouseDownIsPrimary) this.createTaskAtDate(dateStr);
 			},
 		};
 
@@ -1266,7 +1271,7 @@ export class GanttChartView extends BasesView {
 		menu.addItem((item) => {
 			item.setTitle('Scroll to today')
 				.setIcon('calendar')
-				.onClick(() => this.gantt?.scroll_current());
+				.onClick(() => this.scrollToToday());
 		});
 
 		menu.showAtMouseEvent(evt);
@@ -1287,7 +1292,7 @@ export class GanttChartView extends BasesView {
 		menu.addItem((item) => {
 			item.setTitle('Scroll to today')
 				.setIcon('calendar')
-				.onClick(() => this.gantt?.scroll_current());
+				.onClick(() => this.scrollToToday());
 		});
 
 		menu.showAtMouseEvent(evt);
