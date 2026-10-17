@@ -133,7 +133,7 @@ If auto-detection picks the wrong properties (or you want to override it), you c
 
 ### Zooming
 
-Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoothly from hours out to years. The date under the pointer stays in place, and the header switches between day, week, month and year columns as you zoom. The zoom level is saved with the view.
+Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoothly from hours out to years. The date under the pointer stays in place, and the header switches between day, week, month and year columns as you zoom. Zoom level and scroll position are remembered per view on each device, without touching the `.base` file.
 
 ### Display Section
 

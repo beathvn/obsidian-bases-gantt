@@ -117,15 +117,18 @@ interface UndoBatch {
 }
 
 /**
- * Where a chart was scrolled to, so leaving a base and coming back (or an
- * Obsidian restart) puts the view where it was. Kept per device in the
- * vault's local storage rather than the .base file, which would otherwise
- * be rewritten on every pan. Zoom lives in the view config instead.
+ * Where a chart was scrolled and zoomed to, so leaving a base and coming back
+ * (or an Obsidian restart) puts the view where it was. Kept per device in the
+ * vault's local storage rather than the .base file, which would otherwise be
+ * rewritten (and show up in git / sync) on every pan or zoom. A "zoom" in the
+ * view config is only read, as the default for devices without saved state.
  */
 interface ScrollState {
 	/** Date at the left edge, as epoch ms (robust to the grid range changing). */
 	left: number;
 	top: number;
+	/** Pixels per day; missing in states saved before zoom was kept here. */
+	zoom?: number;
 }
 
 const SCROLL_STATE_KEY = 'bases-gantt-scroll';
@@ -213,7 +216,7 @@ export class GanttChartView extends BasesView {
 			this.getStoredZoom(),
 			() => this.gantt,
 			() => this.afterRender(),
-			(pxPerDay) => this.config.set('zoom', Math.round(pxPerDay * 1000) / 1000),
+			() => this.recordScroll(),
 		);
 		// Non-passive so a pinch / Ctrl+wheel can be kept from scrolling.
 		this.registerDomEvent(this.ganttEl, 'wheel', (evt) => this.zoom.handleWheel(evt), { passive: false });
@@ -375,7 +378,7 @@ export class GanttChartView extends BasesView {
 		this.zoom.zoomBy(1 / 1.5);
 	}
 
-	/** Saved zoom (pixels per day), falling back to the former "View mode" option. */
+	/** Default zoom (pixels per day) from the view config, falling back to the former "View mode" option. */
 	private getStoredZoom(): number {
 		const zoom = this.config?.get('zoom');
 		if (typeof zoom === 'number' && zoom > 0) return zoom;
@@ -413,7 +416,7 @@ export class GanttChartView extends BasesView {
 		const left = this.zoom.leftEdgeDate();
 		if (!left || !this.gantt) return;
 		const top = this.ganttEl.scrollTop || this.gantt.$container.scrollTop;
-		this.scrollState = { left: left.getTime(), top };
+		this.scrollState = { left: left.getTime(), top, zoom: Math.round(this.zoom.pxPerDay * 1000) / 1000 };
 		window.clearTimeout(this.scrollSaveTimer);
 		this.scrollSaveTimer = window.setTimeout(() => this.saveScrollState(), GanttChartView.SCROLL_SAVE_MS);
 	}
@@ -662,11 +665,12 @@ export class GanttChartView extends BasesView {
 
 		// The view config isn't available yet in onload, so apply the saved
 		// zoom here, before the first chart is built.
+		const savedScroll = this.getSavedScrollState();
 		if (!this.zoomRestored) {
 			this.zoomRestored = true;
-			this.zoom.zoomTo(this.getStoredZoom());
+			const zoom = savedScroll?.zoom;
+			this.zoom.zoomTo(typeof zoom === 'number' && zoom > 0 ? zoom : this.getStoredZoom());
 		}
-		const savedScroll = this.getSavedScrollState();
 
 		const barHeight = (this.config.get('barHeight') as number) || 30;
 		const showProgress = (this.config.get('showProgress') as boolean) ?? false;
