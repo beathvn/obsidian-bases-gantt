@@ -1,6 +1,6 @@
 # Hover popup
 
-Resting on a bar for 0.8 s shows a popup with dates, duration, original start, progress, dependencies, chosen properties and a read-only, scrollable preview of the note. A click on it opens the note.
+When enabled (view option **Show details on hover**, off by default), resting on a bar for 0.8 s shows a popup with dates, duration, original start, progress, dependencies, chosen properties and a read-only, scrollable preview of the note. A click on it opens the note.
 
 ## Content
 
@@ -29,5 +29,5 @@ stateDiagram-v2
 
 ## Switches
 
-- View option **Show details on hover**: checked on every hover, returning `false` to Frappe, so no rebuild is needed.
+- View option **Show details on hover** (off by default): checked on every hover, returning `false` to Frappe, so no rebuild is needed.
 - Plugin settings **Properties on hover** and **Note preview on hover**.

@@ -142,7 +142,7 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 - **Show progress** — Toggle the progress bar overlay on tasks
 - **Show expected progress** — When progress is shown, adds a dashed line indicating where progress *should* be based on how much time has elapsed
 - **Show original start** — For bars that begin at a planned start, draw a faint dotted line back to the note's own start date
-- **Show details on hover** — Show a popup with the task's dates, progress, dependencies, chosen properties and a preview of the note when you hover over a bar (on by default)
+- **Show details on hover** — Show a popup with the task's dates, progress, dependencies, chosen properties and a preview of the note when you hover over a bar (off by default)
 
 ---
 
@@ -172,7 +172,7 @@ Opens a context menu:
 Creates a new task at that specific date.
 
 ### Hover over a bar
-Shows a popup with:
+If enabled, shows a popup with:
 - Date range and duration
 - When the task started, if its bar begins at a planned start
 - Progress bar (if enabled)
@@ -180,7 +180,7 @@ Shows a popup with:
 - The properties chosen under **Properties on hover** in the plugin settings
 - A scrollable, read-only preview of the note's content (can be turned off in the plugin settings)
 
-Click the popup to open the note. Turn it off with **Show details on hover** in the view's Display options.
+Turn it on with **Show details on hover** in the view's Display options. Click the popup to open the note.
 
 ### Drag the progress handle
 If "Show progress" is enabled, a small handle appears inside the bar. Drag it to change the completion percentage.

@@ -877,7 +877,8 @@ export class GanttChartView extends BasesView {
 			// Rich hover popup
 			popup: (ctx: PopupContext) => {
 				// Read on every hover, so turning it off needs no rebuild.
-				if (this.config.get('showPopup') === false) return false;
+				// Off unless turned on in the view's Display options.
+				if (this.config.get('showPopup') !== true) return false;
 				this.renderPopup(ctx, showProgress);
 			},
 
@@ -1444,7 +1445,7 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 					type: 'toggle',
 					key: 'showPopup',
 					displayName: 'Show details on hover',
-					default: true,
+					default: false,
 				},
 			],
 		},
