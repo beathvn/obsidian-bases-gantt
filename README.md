@@ -75,7 +75,7 @@ The Gantt chart reads frontmatter properties from your notes. Here's what it can
 
 | Property | What it does | Example |
 |----------|-------------|---------|
-| **End date** | When the task ends. If omitted, defaults to 1 day after start. | `end-date: 2026-03-05` |
+| **End date** | When the task ends. If omitted, the bar is drawn with a default length (91 days, adjustable in the plugin settings). | `end-date: 2026-03-05` |
 | **Progress** | Completion percentage (0–100). Enables the progress bar on the task. | `progress: 40` |
 | **Dependencies** | Wiki-links to notes that must finish first. Shows arrows between bars. | `depends-on: "[[Design]]"` |
 | **Status / Priority / etc.** | Any text property can be used to color-code the bars. | `status: In Progress` |
@@ -146,10 +146,10 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 ## Interacting with the Chart
 
 ### Drag a bar left/right
-Reschedules the task — changes the start and end dates. The dates are written back to the note's frontmatter automatically.
+Reschedules the task — changes the start and end dates. The dates are written back to the note's frontmatter automatically. Tasks that depend on it move along by the same amount (this can be turned off in the plugin settings). Drags snap to whole days when the chart shows day columns, and to whole weeks when zoomed out further.
 
 ### Drag the right edge of a bar
-Resizes the task — changes the end date while keeping the start date fixed.
+Resizes the task — changes the end date while keeping the start date fixed. On a task without an end date, this sets one.
 
 ### Click a bar
 Opens the note in the current tab.
@@ -183,6 +183,15 @@ If "Show progress" is enabled, a small handle appears inside the bar. Drag it to
 ## Grouping Tasks
 
 If you configure **grouping** in the view (e.g., group by `status`), the Gantt chart reflects this with **group headers** — visual section bars that span the full date range of their group's tasks.
+
+---
+
+## Plugin Settings
+
+Under **Settings → Community plugins → Bases Gantt**:
+
+- **Move dependent tasks along** — When you drag a task, shift every task that depends on it by the same amount. Turn off to keep dependent tasks fixed in place.
+- **Default length without end date** — How many days a task without an end date is drawn (default 91).
 
 ---
 

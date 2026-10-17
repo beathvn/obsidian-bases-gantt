@@ -604,6 +604,7 @@ export class GanttChartView extends BasesView {
 			progressProperty,
 			showProgress: (this.config.get('showProgress') as boolean) ??
 				(progressProperty != null), // auto-enable if progress property detected
+			defaultDurationDays: this.plugin.settings.defaultDurationDays,
 		};
 	}
 
