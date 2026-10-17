@@ -73,6 +73,7 @@ declare module 'frappe-gantt' {
 		$svg: SVGElement;
 		$container: HTMLElement;
 		tasks: FrappeTask[];
+		options: GanttOptions;
 
 		refresh(tasks: FrappeTask[]): void;
 		change_view_mode(mode?: string, maintain_pos?: boolean): void;

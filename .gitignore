@@ -3,3 +3,4 @@ main.js
 styles.css
 *.map
 .DS_Store
+data.json

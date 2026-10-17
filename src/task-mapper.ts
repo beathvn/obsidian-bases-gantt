@@ -31,8 +31,11 @@ export interface TaskMapperConfig {
 /** Color class palette — maps to CSS classes gantt-color-0 through gantt-color-7. */
 const COLOR_CLASS_COUNT = 8;
 
-/** How long a task without an end date is drawn. */
-const DEFAULT_DURATION_MONTHS = 3;
+/**
+ * How long a task without an end date is drawn: about 3 months, as a fixed
+ * day count so the bar keeps its length when moved (calendar months vary).
+ */
+const DEFAULT_DURATION_DAYS = 91;
 
 /**
  * Extract a string representation from an Obsidian Value object.
@@ -149,11 +152,11 @@ export function mapEntriesToTasks(
 			const endVal = entry.getValue(config.endProperty);
 			endDate = parseObsidianDate(extractRawValue(endVal));
 		}
-		// Default: if no end date, show the task as running 3 months
+		// Default: if no end date, show the task as running about 3 months
 		const hasEnd = endDate != null;
 		if (!endDate) {
 			endDate = new Date(startDate);
-			endDate.setMonth(endDate.getMonth() + DEFAULT_DURATION_MONTHS);
+			endDate.setDate(endDate.getDate() + DEFAULT_DURATION_DAYS);
 		}
 
 		// Ensure end >= start

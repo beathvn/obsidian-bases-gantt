@@ -1,13 +1,19 @@
 import { Plugin } from 'obsidian';
 import { GanttChartView, getGanttViewOptions } from './gantt-view';
+import { BasesGanttSettings, BasesGanttSettingTab, DEFAULT_SETTINGS } from './settings';
 
 export default class BasesGanttPlugin extends Plugin {
-	onload() {
+	settings: BasesGanttSettings = DEFAULT_SETTINGS;
+
+	async onload() {
+		await this.loadSettings();
+		this.addSettingTab(new BasesGanttSettingTab(this.app, this));
+
 		this.registerBasesView('gantt', {
 			name: 'Gantt',
 			icon: 'calendar-range',
 			factory: (controller, containerEl) => {
-				return new GanttChartView(controller, containerEl);
+				return new GanttChartView(controller, containerEl, this);
 			},
 			options: (config) => getGanttViewOptions(config),
 		});
@@ -108,6 +114,14 @@ export default class BasesGanttPlugin extends Plugin {
 				view?.setViewMode('Year');
 			},
 		});
+	}
+
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
 	}
 
 	private getActiveGanttView(): GanttChartView | null {

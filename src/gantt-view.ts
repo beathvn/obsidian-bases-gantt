@@ -16,6 +16,7 @@ import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
 import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll } from './zoom';
+import type BasesGanttPlugin from './main';
 
 // ── Drag moves the whole dependency chain ──
 // Frappe's get_all_dependent_tasks marks each level as seen before filtering
@@ -202,7 +203,7 @@ export class GanttChartView extends BasesView {
 	private scrollSaveTimer = 0;
 	private static readonly SCROLL_SAVE_MS = 500;
 
-	constructor(controller: QueryController, containerEl: HTMLElement) {
+	constructor(controller: QueryController, containerEl: HTMLElement, private plugin: BasesGanttPlugin) {
 		super(controller);
 		this.containerEl = containerEl;
 	}
@@ -273,6 +274,11 @@ export class GanttChartView extends BasesView {
 	/** Check if this view is inside the currently active workspace leaf. */
 	isInActiveLeaf(): boolean {
 		return this.containerEl.closest('.workspace-leaf.mod-active') != null;
+	}
+
+	/** Push plugin settings into the live chart. Frappe reads these at drag start, so no re-render is needed. */
+	applyPluginSettings(): void {
+		if (this.gantt) this.gantt.options.move_dependencies = this.plugin.settings.moveDependentTasks;
 	}
 
 	/** Public: scroll chart to today (for command palette). */
@@ -532,13 +538,17 @@ export class GanttChartView extends BasesView {
 
 		// Auto-detect properties from data when not manually configured.
 		// Manually configured properties always win over detected ones.
-		if (!startProperty && this.data?.data?.length > 0) {
+		if ((!startProperty || !endProperty) && this.data?.data?.length > 0) {
 			const detected = this.autoDetectProperties();
-			startProperty = detected.start;
-			endProperty = endProperty ?? detected.end;
-			dependenciesProperty = dependenciesProperty ?? detected.dependencies;
-			progressProperty = progressProperty ?? detected.progress;
-			colorByProperty = colorByProperty ?? detected.colorBy;
+			if (!startProperty) {
+				startProperty = detected.start;
+				dependenciesProperty = dependenciesProperty ?? detected.dependencies;
+				progressProperty = progressProperty ?? detected.progress;
+				colorByProperty = colorByProperty ?? detected.colorBy;
+			}
+			// The end is also detected when only the start was configured,
+			// but never as the configured start itself.
+			if (!endProperty && detected.end !== startProperty) endProperty = detected.end;
 		}
 
 		return {
@@ -696,7 +706,7 @@ export class GanttChartView extends BasesView {
 			// Enhanced options
 			arrow_curve: 15,
 			auto_move_label: true,
-			move_dependencies: true,
+			move_dependencies: this.plugin.settings.moveDependentTasks,
 			show_expected_progress: showExpectedProgress && showProgress,
 			hover_on_date: true,
 			popup_on: 'hover',
@@ -736,8 +746,10 @@ export class GanttChartView extends BasesView {
 				const newStart = formatDateForFrontmatter(start);
 				const newEnd = formatDateForFrontmatter(end);
 				const resized = daysBetween(newStart, newEnd) !== daysBetween(ganttTask.start, ganttTask.end);
-				if (mapperConfig.endProperty && isNoteProperty(mapperConfig.endProperty) && (ganttTask.hasEnd || resized)) {
-					const propName = this.extractPropertyName(mapperConfig.endProperty);
+				// Resizing when no note has an end property yet starts one.
+				const endProperty = mapperConfig.endProperty ?? (resized ? this.newEndProperty(mapperConfig.startProperty) : null);
+				if (endProperty && isNoteProperty(endProperty) && (ganttTask.hasEnd || resized)) {
+					const propName = this.extractPropertyName(endProperty);
 					previous[propName] = ganttTask.hasEnd ? ganttTask.end : '';
 					updates[propName] = newEnd;
 				}
@@ -1009,6 +1021,16 @@ export class GanttChartView extends BasesView {
 	/**
 	 * Extract the property name from a BasesPropertyId (e.g. "note.start-date" -> "start-date").
 	 */
+	/** End property to create next to `start`: "startDate" → "endDate", "start_date" → "end_date", otherwise "end". */
+	private newEndProperty(start: BasesPropertyId | null): BasesPropertyId | null {
+		if (!start || !isNoteProperty(start)) return null;
+		const startName = this.extractPropertyName(start);
+		const name = /start/i.test(startName)
+			? startName.replace(/start/i, (m) => (m === 'START' ? 'END' : m[0] === 'S' ? 'End' : 'end'))
+			: 'end';
+		return `note.${name}` as BasesPropertyId;
+	}
+
 	private extractPropertyName(propertyId: BasesPropertyId): string {
 		const dotIndex = propertyId.indexOf('.');
 		return dotIndex >= 0 ? propertyId.slice(dotIndex + 1) : propertyId;
