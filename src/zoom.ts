@@ -48,8 +48,8 @@ export function clampZoom(pxPerDay: number): number {
 	return Math.min(MAX_PX_PER_DAY, Math.max(MIN_PX_PER_DAY, pxPerDay));
 }
 
-/** Frappe's default weekend shading. Below Week zoom a day is a few pixels wide, so the shading is
- * just stripes — and Frappe draws one element per day, the bulk of a far-out render. */
+/** Frappe's default weekend shading. Below Week zoom a day is a few pixels wide, so the shading
+ * would just be stripes; it's off there (and so are day hover and click-to-create). */
 const WEEKEND_SHADING: Record<string, string> = { 'var(--g-weekend-highlight-color)': 'weekend' };
 function holidaysFor(pxPerDay: number): typeof WEEKEND_SHADING | null {
 	return pxPerDay >= 4 ? WEEKEND_SHADING : null;
@@ -104,32 +104,39 @@ function monthName(d: Date, lang: string, style: 'long' | 'short'): string {
 const LABEL_SHARE = 0.8;
 const LABEL_PILL_PADDING = 12;
 let measureCtx: CanvasRenderingContext2D | null = null;
-const labelWidths = new Map<string, number>();
+/** Format chosen per label kind, column width and language: decided once per zoom level, not per column. */
+const fittingFormats = new Map<string, number>();
 
-function labelWidth(text: string): number {
-	const family = getComputedStyle(document.body).getPropertyValue('--font-interface').trim() || 'sans-serif';
-	const font = `700 12px ${family}`;
-	const key = `${font}|${text}`;
-	let width = labelWidths.get(key);
-	if (width === undefined) {
-		measureCtx ??= document.createElement('canvas').getContext('2d');
-		if (!measureCtx) return 0;
-		measureCtx.font = font;
-		width = measureCtx.measureText(text).width;
-		labelWidths.set(key, width);
-	}
-	return width;
+/** Forget the chosen label formats, e.g. after the theme (and so maybe the font) changed. */
+export function clearLabelFormats(): void {
+	fittingFormats.clear();
 }
 
 /**
  * Index of the first (most detailed) label format that fits a column of
  * this width, judged by each format's widest sample, so every column at a
- * zoom level gets the same format. Else the last format.
+ * zoom level gets the same format. Else the last format. The samples (all
+ * labels of a format that could be the widest) are
+ * only built and measured on the first call for a width; reading the font
+ * on every label would force a style recalculation per column mid-render.
  */
-function fittingFormat(columnWidth: number, widestSamples: string[]): number {
-	const room = columnWidth * LABEL_SHARE - LABEL_PILL_PADDING;
-	const index = widestSamples.findIndex((label) => labelWidth(label) <= room);
-	return index >= 0 ? index : widestSamples.length - 1;
+function fittingFormat(kind: string, columnWidth: number, lang: string, widestSamples: () => string[][]): number {
+	const key = `${kind}|${columnWidth}|${lang}`;
+	let index = fittingFormats.get(key);
+	if (index === undefined) {
+		const family = getComputedStyle(document.body).getPropertyValue('--font-interface').trim() || 'sans-serif';
+		measureCtx ??= document.createElement('canvas').getContext('2d');
+		const ctx = measureCtx;
+		if (ctx) ctx.font = `700 12px ${family}`;
+		const room = columnWidth * LABEL_SHARE - LABEL_PILL_PADDING;
+		const samples = widestSamples();
+		index = samples.findIndex((labels) => !ctx || labels.every((label) => ctx.measureText(label).width <= room));
+		if (index < 0) index = samples.length - 1;
+		// Continuous zoom makes a new width at every step; keep the map small.
+		if (fittingFormats.size > 200) fittingFormats.clear();
+		fittingFormats.set(key, index);
+	}
+	return index;
 }
 
 /** A week spanning two months, with the longest numbers: the widest week labels. */
@@ -146,20 +153,21 @@ function createViewModes(getPxPerDay: () => number): FrappeViewMode[] {
 		{
 			...BASE_MODES.MONTH,
 			lower_text: (d, _ld, lang) => {
-				const longest = (style: 'long' | 'short') => Array.from({ length: 12 }, (_, m) => monthName(new Date(2026, m, 1), lang, style))
-					.reduce((a, b) => (labelWidth(b) > labelWidth(a) ? b : a));
-				const format = fittingFormat(getPxPerDay() * 30, [longest('long'), longest('short')]);
+				// Every month name is a sample: the widest one decides.
+				const names = (style: 'long' | 'short') =>
+					Array.from({ length: 12 }, (_, m) => monthName(new Date(2026, m, 1), lang, style));
+				const format = fittingFormat('month', getPxPerDay() * 30, lang, () => [names('long'), names('short')]);
 				return monthName(d, lang, format === 0 ? 'long' : 'short');
 			},
 		},
 		{
 			...BASE_MODES.WEEK,
 			lower_text: (d, ld, lang) => {
-				const format = fittingFormat(getPxPerDay() * 7, [
-					`W52 · ${formatWeekRange(WIDE_WEEK, null, lang)}`,
-					`W52 · 28 ${monthName(WIDE_WEEK, lang, 'short')}`,
-					'W52',
-					'52',
+				const format = fittingFormat('week', getPxPerDay() * 7, lang, () => [
+					[`W52 · ${formatWeekRange(WIDE_WEEK, null, lang)}`],
+					[`W52 · 28 ${monthName(WIDE_WEEK, lang, 'short')}`],
+					['W52'],
+					['52'],
 				]);
 				const week = getISOWeekNumber(d);
 				return [
@@ -195,6 +203,14 @@ interface FrappeInternals {
 	setup_gantt_dates(refresh?: boolean): void;
 	setup_date_values(): void;
 	setup_dates(refresh?: boolean): void;
+	highlight_holidays(): void;
+	/** Grid range cut short at the start / end to MAX_COLUMNS (see setup_dates). */
+	windowed?: { start: boolean; end: boolean };
+	windowCenter?: Date;
+	/** Frappe: null outside a drag, false/true from mousedown on a bar. */
+	bar_being_dragged?: boolean | null;
+	dates: Date[];
+	$svg: SVGSVGElement;
 }
 
 function internals(gantt: Gantt): FrappeInternals {
@@ -213,12 +229,43 @@ function startOfUnit(date: Date, unit: string): Date {
 // leave no room to keep the date under the cursor in place. Pad each side by
 // at least one viewport width instead. Week columns are also rolled back to
 // start on Monday (Frappe has no week-start option).
+//
+// The grid also never gets more than MAX_COLUMNS columns: at Day zoom and
+// finer, projects spanning years would mean thousands of columns, each with
+// header label, tick and highlight, rebuilt on every zoom frame. Then only a
+// window around the visible date (renderCenter) is drawn, and it is moved
+// along when scrolling gets close to its edges (ZoomController.extendWindow).
+const MAX_COLUMNS = 800;
+
+/** Date the next render's grid window is centered on (set around each render). */
+let renderCenter: Date | null = null;
+
+/**
+ * While a zoom gesture is under way, the grid is cut to this many viewport
+ * widths: each frame of the gesture redraws the chart, and drawing just
+ * what's in view (plus a margin to pan into) keeps that cheap. Once the
+ * gesture rests, the chart is drawn once more with the full window.
+ */
+const GESTURE_VIEWPORTS = 5;
+let gestureWindow = false;
+
+/** Run a render (or the chart's construction) with its grid window centered on `center`. */
+export function withRenderCenter<T>(center: Date | null, render: () => T): T {
+	renderCenter = center;
+	try {
+		return render();
+	} finally {
+		renderCenter = null;
+	}
+}
+
 const ganttProto = Gantt.prototype as unknown as FrappeInternals;
 ganttProto.setup_dates = function (this: FrappeInternals, refresh?: boolean): void {
 	this.setup_gantt_dates(refresh);
 	if (!refresh) {
 		const { column_width, step, unit } = this.config;
-		const padMs = ((this.$container.clientWidth || 1000) / (column_width / (step * DAYS_PER_UNIT[unit]))) * DAY_MS;
+		const msPerColumn = step * DAYS_PER_UNIT[unit] * DAY_MS;
+		const padMs = ((this.$container.clientWidth || 1000) / column_width) * msPerColumn;
 		let first = Date.now();
 		let last = first;
 		if (this.tasks.length) {
@@ -233,6 +280,23 @@ ganttProto.setup_dates = function (this: FrappeInternals, refresh?: boolean): vo
 		if (start < this.gantt_start) this.gantt_start = start;
 		const end = new Date(last + padMs);
 		if (end > this.gantt_end) this.gantt_end = end;
+
+		const viewportColumns = (this.$container.clientWidth || 1000) / column_width;
+		const maxColumns = gestureWindow ? Math.min(MAX_COLUMNS, Math.ceil(GESTURE_VIEWPORTS * viewportColumns)) : MAX_COLUMNS;
+		const windowMs = maxColumns * msPerColumn;
+		this.windowed = { start: false, end: false };
+		if (this.gantt_end.getTime() - this.gantt_start.getTime() > windowMs) {
+			const center = (renderCenter ?? this.windowCenter ?? new Date()).getTime();
+			this.windowCenter = new Date(center);
+			const fullStart = this.gantt_start.getTime();
+			const fullEnd = this.gantt_end.getTime();
+			// Centered, but shifted to stay inside the full range.
+			const to = Math.min(fullEnd, Math.max(fullStart, center - windowMs / 2) + windowMs);
+			const from = Math.max(fullStart, to - windowMs);
+			this.gantt_start = startOfUnit(new Date(from), unit);
+			this.gantt_end = new Date(to);
+			this.windowed = { start: this.gantt_start.getTime() > fullStart, end: to < fullEnd };
+		}
 	}
 	if (this.config.view_mode?.name === 'Week') {
 		const diffToMonday = (this.gantt_start.getDay() + 6) % 7;
@@ -242,6 +306,65 @@ ganttProto.setup_dates = function (this: FrappeInternals, refresh?: boolean): vo
 	}
 	this.setup_date_values();
 };
+
+// Frappe's highlight_holidays() draws one rect per day of the whole grid
+// range (for the weekend shading, and as hover / click target), formatting
+// each date on the way: with projects spanning years, thousands of elements
+// and most of the render time at Week zoom and finer, so zooming stuttered.
+// Instead: one rect per weekend, one transparent click target for the whole
+// grid (Frappe maps a click to a date by x), and one hover highlight that
+// follows the pointer from day to day.
+ganttProto.highlight_holidays = function (this: FrappeInternals): void {
+	const grid = this.layers?.grid;
+	const holidays = (this as unknown as { options: { holidays?: Record<string, string> | null } }).options.holidays;
+	if (!grid || !holidays) return;
+	const color = Object.keys(holidays)[0];
+	const top = this.config.header_height;
+	const height = this.grid_height - top;
+	const width = this.dates.length * this.config.column_width;
+	if (height <= 0) return;
+
+	const saturday = new Date(this.gantt_start.getFullYear(), this.gantt_start.getMonth(), this.gantt_start.getDate());
+	saturday.setDate(saturday.getDate() + ((6 - saturday.getDay() + 7) % 7));
+	for (const d = saturday; d <= this.gantt_end; d.setDate(d.getDate() + 7)) {
+		const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 2);
+		const x = xForDateInternal(this, d);
+		svgEl('rect', { class: 'holiday-highlight', x, y: top, width: xForDateInternal(this, monday) - x, height, style: `fill: ${color};` }, grid);
+	}
+
+	// Frappe listens for mousedown on .grid-column to report a date click.
+	svgEl('rect', { class: 'grid-column gantt-click-target', x: 0, y: top, width, height }, grid);
+	svgEl('rect', { class: 'gantt-day-hover', x: 0, y: top, width: 0, height }, grid);
+	trackDayHover(this);
+};
+
+/**
+ * Move the day hover highlight under the pointer, one listener per chart.
+ * The rect is looked up each time: right after highlight_holidays() Frappe
+ * appends to the grid layer with innerHTML +=, which recreates its elements.
+ */
+function trackDayHover(g: FrappeInternals): void {
+	const state = g as unknown as { tracksDayHover?: boolean };
+	if (state.tracksDayHover) return;
+	state.tracksDayHover = true;
+	const hoverRect = () => g.$svg.querySelector('.gantt-day-hover');
+	g.$svg.addEventListener('mousemove', (evt) => {
+		const rect = hoverRect();
+		if (!rect) return;
+		if (!(evt.target as Element).classList?.contains('gantt-click-target')) {
+			rect.setAttribute('width', '0');
+			return;
+		}
+		const x = evt.clientX - g.$svg.getBoundingClientRect().left;
+		const at = dateForX(g, x);
+		const day = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+		const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+		const x0 = xForDateInternal(g, day);
+		rect.setAttribute('x', String(x0));
+		rect.setAttribute('width', String(xForDateInternal(g, next) - x0));
+	});
+	g.$svg.addEventListener('mouseleave', () => hoverRect()?.setAttribute('width', '0'));
+}
 
 /**
  * Construct a chart without Frappe's initial smooth scroll to
@@ -426,9 +549,13 @@ export class ZoomController {
 	private readonly viewModes: FrappeViewMode[];
 	private pending: { pxPerDay: number; anchor: Date; anchorX: number } | null = null;
 	private frame = 0;
+	private windowFrame = 0;
 	private settleTimer = 0;
 	private pinch: { distance: number; targets: EventTarget[] } | null = null;
 	private static readonly SETTLE_MS = 400;
+	/** No zoom event for this long ends a gesture (see GESTURE_VIEWPORTS). */
+	private static readonly GESTURE_REST_MS = 150;
+	private gestureTimer = 0;
 
 	constructor(
 		initialPxPerDay: number,
@@ -583,7 +710,31 @@ export class ZoomController {
 		g.$container.scrollLeft = xForDateInternal(g, date);
 	}
 
+	/**
+	 * On scroll: when the grid is cut short (see MAX_COLUMNS) and the view
+	 * gets within a viewport of a cut edge, redraw it centered on the view.
+	 * Not during a bar drag, which a redraw would end.
+	 */
+	extendWindow(): void {
+		const gantt = this.getGantt();
+		// Mid-gesture the full window is drawn when the gesture rests anyway.
+		if (!gantt || this.windowFrame || this.gestureTimer) return;
+		const g = internals(gantt);
+		const { scrollLeft, clientWidth, scrollWidth } = g.$container;
+		const nearStart = g.windowed?.start && scrollLeft < clientWidth;
+		const nearEnd = g.windowed?.end && scrollLeft + clientWidth > scrollWidth - clientWidth;
+		if (!nearStart && !nearEnd) return;
+		this.windowFrame = requestAnimationFrame(() => {
+			this.windowFrame = 0;
+			if (g.bar_being_dragged != null) return;
+			this.renderAnchored(g, () => g.change_view_mode(bandFor(this.pxPerDay).mode), dateForX(g, g.$container.scrollLeft), 0);
+			this.onRendered();
+		});
+	}
+
 	destroy(): void {
+		window.clearTimeout(this.gestureTimer);
+		cancelAnimationFrame(this.windowFrame);
 		cancelAnimationFrame(this.frame);
 		window.clearTimeout(this.settleTimer);
 		this.endPinch();
@@ -605,8 +756,21 @@ export class ZoomController {
 		g.options.column_width = p.pxPerDay * band.daysPerColumn;
 		g.options.holidays = holidaysFor(p.pxPerDay);
 		g.hide_popup();
-		this.renderAnchored(g, () => g.change_view_mode(band.mode), p.anchor, p.anchorX);
+		gestureWindow = true;
+		try {
+			this.renderAnchored(g, () => g.change_view_mode(band.mode), p.anchor, p.anchorX);
+		} finally {
+			gestureWindow = false;
+		}
 		this.onRendered();
+
+		// Once the gesture rests, draw the full window around the view.
+		window.clearTimeout(this.gestureTimer);
+		this.gestureTimer = window.setTimeout(() => {
+			this.gestureTimer = 0;
+			this.renderAnchored(g, () => g.change_view_mode(bandFor(this.pxPerDay).mode), dateForX(g, g.$container.scrollLeft), 0);
+			this.onRendered();
+		}, ZoomController.GESTURE_REST_MS);
 
 		window.clearTimeout(this.settleTimer);
 		this.settleTimer = window.setTimeout(() => this.onSettled(this.pxPerDay), ZoomController.SETTLE_MS);
@@ -616,8 +780,10 @@ export class ZoomController {
 		// Frappe's render() ends by smooth-scrolling to options.scroll_to;
 		// suppress that so the scroll can be placed under the anchor instead.
 		g.set_scroll_position = () => {};
+		// A cut-short grid is centered on the middle of the viewport after this render.
+		const viewportMiddle = new Date(anchor.getTime() + ((g.$container.clientWidth / 2 - anchorX) / this.pxPerDay) * DAY_MS);
 		try {
-			withCachedDateFormats(render);
+			withRenderCenter(viewportMiddle, () => withCachedDateFormats(render));
 		} finally {
 			delete (g as unknown as Record<string, unknown>).set_scroll_position;
 		}

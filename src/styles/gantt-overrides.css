@@ -97,11 +97,20 @@
 	stroke-dasharray: 4 2;
 }
 
-/* ── Weekend column hover ────────────────────────────────────────── */
+/* ── Day hover / click target ────────────────────────────────────── */
 
-.bases-gantt-view .gantt .grid-column:hover {
+/* One transparent rect over the grid takes the clicks that create a task;
+   the day under the pointer is highlighted by a single moving rect. */
+/* :hover too, over Frappe's own .grid-column:hover fill. */
+.bases-gantt-view .gantt .gantt-click-target,
+.bases-gantt-view .gantt .gantt-click-target:hover {
+	fill: transparent;
+}
+
+.bases-gantt-view .gantt .gantt-day-hover {
 	fill: var(--background-modifier-hover);
 	opacity: 0.25;
+	pointer-events: none;
 }
 
 /* ── Bar colors ──────────────────────────────────────────────────── */

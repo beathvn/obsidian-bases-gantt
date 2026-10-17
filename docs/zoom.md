@@ -37,7 +37,13 @@ Events are batched to one render per animation frame. The date under the pointer
 ## Other adjustments
 
 - **Grid range** (`setup_dates` patch): padded by at least one viewport width on each side, and Week columns start on Monday.
-- **Speed:** renders run with cached `Intl.DateTimeFormat` instances (`withCachedDateFormats`). Frappe would otherwise create two per header label.
+- **Speed:** each zoom step re-renders the whole chart, so per-day and per-column work is kept small:
+  - Renders run with cached `Intl.DateTimeFormat` instances (`withCachedDateFormats`). Frappe would otherwise create two per header label.
+  - `highlight_holidays` is replaced: one rect per weekend (from Week zoom on), one transparent click target for the whole grid, and one day-hover rect moved on `mousemove`. Frappe drew a rect per day of the grid range: thousands for projects spanning years.
+  - Header label formats (`fittingFormat`) are measured once per zoom level, not per column.
+  - The grid has at most 800 columns (`MAX_COLUMNS`). At Day zoom and finer, projects spanning years would need thousands. Beyond that only a window around the view is drawn, centered by `renderAnchored` / `withRenderCenter`. `extendWindow()` redraws it around the view when scrolling gets within a viewport of a cut edge (not during a drag).
+  - While a zoom gesture is under way, only about 5 viewport widths are drawn (`GESTURE_VIEWPORTS`). The full window follows once no zoom event came for 150 ms.
+  - Frappe's grow-from-zero SMIL animation on bars is removed after every render (`afterRender`). Otherwise bars collapsed and regrew whenever a zoom gesture paused.
 - **Today:** `scrollToToday()` replaces Frappe's version, which fails on iOS and when today is outside the grid.
 
 ## Persistence

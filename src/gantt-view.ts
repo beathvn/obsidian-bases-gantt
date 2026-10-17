@@ -15,7 +15,7 @@ import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, GROUP_HEADER_PREFIX, type BarColor, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
-import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll } from './zoom';
+import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll, withRenderCenter, clearLabelFormats } from './zoom';
 import type BasesGanttPlugin from './main';
 import { PALETTE_VARS, barShades, setBarShades, slotsResembling, type BarShades } from './colors';
 
@@ -346,6 +346,7 @@ export class GanttChartView extends BasesView {
 		// The palette follows the theme's --color-* values.
 		this.registerEvent(this.app.workspace.on('css-change', () => {
 			this.shadeCache.clear();
+			clearLabelFormats();
 			this.resolvePalette();
 			this.updateFixedColorStyles();
 		}));
@@ -395,7 +396,10 @@ export class GanttChartView extends BasesView {
 			this.finishDrag();
 		});
 		// Scroll doesn't bubble, but it does pass ancestors in the capture phase.
-		this.registerDomEvent(this.ganttEl, 'scroll', () => this.recordScroll(), { capture: true, passive: true });
+		this.registerDomEvent(this.ganttEl, 'scroll', () => {
+			this.recordScroll();
+			this.zoom.extendWindow();
+		}, { capture: true, passive: true });
 	}
 
 	onunload(): void {
@@ -963,7 +967,12 @@ export class GanttChartView extends BasesView {
 		}) as typeof document.addEventListener;
 
 		try {
-			const create = (): Gantt => withCachedDateFormats(() => new Gantt(this.ganttEl, tasks, options));
+			// A grid cut short at fine zoom is centered on where the view will be.
+			const viewStart = savedScroll ? new Date(savedScroll.left) : parseObsidianDate(earliestDate) ?? new Date();
+			const halfViewDays = (this.ganttEl.clientWidth || 1000) / 2 / this.zoom.pxPerDay;
+			const center = new Date(viewStart.getTime() + halfViewDays * 86_400_000);
+			const create = (): Gantt => withRenderCenter(center, () =>
+				withCachedDateFormats(() => new Gantt(this.ganttEl, tasks, options)));
 			this.gantt = savedScroll ? withoutInitialScroll(create) : create();
 			patchBarDateMath(this.gantt);
 			patchDragSnap(this.gantt);
@@ -984,6 +993,11 @@ export class GanttChartView extends BasesView {
 	/** Decorations Frappe doesn't draw itself; needed after every Frappe render, which rebuilds the SVG. */
 	private afterRender(): void {
 		if (!this.gantt) return;
+		// Frappe has every bar (and progress bar) grow from zero width with a
+		// SMIL animation, starting 0.1 s after each render. Renders happen on
+		// every zoom frame, so bars kept collapsing and regrowing whenever a
+		// zoom gesture paused or ended; draw them at their size right away.
+		this.gantt.$svg.querySelectorAll('animate').forEach((animation) => animation.remove());
 		const showOriginalStart = this.config.get('showOriginalStart') === true;
 		drawQuarterBackdrop(this.gantt);
 		// Milestone class can't be combined with the color class in
