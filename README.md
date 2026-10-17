@@ -139,6 +139,7 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 - **Bar height** — How tall the task bars are (16–60 pixels)
 - **Show progress** — Toggle the progress bar overlay on tasks
 - **Show expected progress** — When progress is shown, adds a dashed line indicating where progress *should* be based on how much time has elapsed
+- **Show details on hover** — Show a popup with the task's dates, progress, dependencies, chosen properties and a preview of the note when you hover over a bar (on by default)
 
 ---
 
@@ -172,7 +173,10 @@ Shows a popup with:
 - Date range and duration
 - Progress bar (if enabled)
 - Dependencies (names of linked tasks)
-- A preview of the note's content
+- The properties chosen under **Properties on hover** in the plugin settings
+- A scrollable, read-only preview of the note's content (can be turned off in the plugin settings)
+
+Click the popup to open the note. Turn it off with **Show details on hover** in the view's Display options.
 
 ### Drag the progress handle
 If "Show progress" is enabled, a small handle appears inside the bar. Drag it to change the completion percentage.
@@ -191,6 +195,8 @@ Under **Settings → Community plugins → Bases Gantt**:
 
 - **Move dependent tasks along** — When you drag a task, shift every task that depends on it by the same amount. Turn off to keep dependent tasks fixed in place.
 - **Default length without end date** — How many days a task without an end date is drawn (default 91).
+- **Properties on hover** — Note properties to show in the hover popup, separated by commas (e.g. `status, owner, priority`).
+- **Note preview on hover** — Show a preview of the note's content in the hover popup (on by default).
 - **Value colors** — Give specific values of the **Color by** property a fixed color (e.g. `done` → green). Matching ignores case. Values not listed here get a color automatically, which they keep while the value is in use, so adding new values never recolors existing bars. Automatic colors skip any palette color that looks like one you fixed.
 
 ---

@@ -148,6 +148,69 @@ function patchDragSnap(gantt: Gantt): void {
 	};
 }
 
+/**
+ * Hover popup behavior Frappe doesn't have: it is moved to stay in view
+ * (`fit`), and leaving the bar only closes it after a short delay, so the
+ * pointer can move onto the popup, which then stays open until left. Frappe
+ * creates the Popup on first show, so its hide() is wrapped then.
+ */
+function patchPopup(gantt: Gantt, fit: () => void, isPointerDown: () => boolean): void {
+	interface FrappePopup { parent: HTMLElement; hide(): void }
+	const g = gantt as unknown as { popup?: FrappePopup; show_popup(opts: unknown): void };
+	const showPopup = g.show_popup.bind(g);
+	let hideTimer = 0;
+	let hovered = false;
+	let wrapped: FrappePopup | null = null;
+	let showTimer = 0;
+	g.show_popup = (opts) => {
+		// Frappe shows it 200 ms after the pointer enters a bar, which gets in
+		// the way of dragging bars around; wait a while longer, and only show
+		// it if the pointer is still resting on that bar.
+		window.clearTimeout(showTimer);
+		// The whole bar group, so resting on the bar's label counts too.
+		const bar = (opts as { target?: Element }).target?.closest('.bar-wrapper');
+		showTimer = window.setTimeout(() => {
+			if (isPointerDown() || (bar && !bar.matches(':hover'))) return;
+			show(opts);
+		}, POPUP_EXTRA_SHOW_DELAY_MS);
+	};
+	// Pressing on a bar (to drag it) cancels a popup that is about to show.
+	(gantt as unknown as { $svg: SVGElement }).$svg.addEventListener('mousedown', () => window.clearTimeout(showTimer), true);
+	const show = (opts: unknown): void => {
+		window.clearTimeout(hideTimer);
+		showPopup(opts);
+		const popup = g.popup;
+		if (popup && popup !== wrapped) {
+			wrapped = popup;
+			const hideNow = popup.hide.bind(popup);
+			popup.hide = () => {
+				window.clearTimeout(hideTimer);
+				// A drag closes it right away; leaving the bar gives the pointer time to reach it.
+				if (isPointerDown()) {
+					hideNow();
+					return;
+				}
+				hideTimer = window.setTimeout(() => {
+					if (!hovered) hideNow();
+				}, POPUP_HIDE_DELAY_MS);
+			};
+			popup.parent.addEventListener('mouseenter', () => {
+				hovered = true;
+				window.clearTimeout(hideTimer);
+			});
+			popup.parent.addEventListener('mouseleave', () => {
+				hovered = false;
+				hideNow();
+			});
+		}
+		fit();
+	};
+}
+
+const POPUP_HIDE_DELAY_MS = 300;
+/** On top of Frappe's own 200 ms, so the popup appears after resting on a bar for 0.8 s. */
+const POPUP_EXTRA_SHOW_DELAY_MS = 600;
+
 /** One file's prior frontmatter values, so a drag-caused write can be reverted. */
 interface UndoFileChange {
 	filePath: string;
@@ -181,6 +244,14 @@ const SCROLL_STATE_KEY = 'bases-gantt-scroll';
 const MAX_SCROLL_STATES = 100;
 
 /** Only note (frontmatter) properties can be written; file.* and formula.* are computed. */
+/** A frontmatter value as plain text: lists joined, [[links]] shown by their name or alias. */
+function formatPropertyValue(value: unknown): string {
+	if (value == null) return '';
+	if (Array.isArray(value)) return value.map(formatPropertyValue).filter(Boolean).join(', ');
+	if (typeof value === 'object') return JSON.stringify(value);
+	return String(value).replace(/\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g, (_, target: string, alias?: string) => alias ?? target);
+}
+
 function isNoteProperty(id: BasesPropertyId): boolean {
 	return !id.startsWith('file.') && !id.startsWith('formula.');
 }
@@ -247,6 +318,10 @@ export class GanttChartView extends BasesView {
 	private scrollStateKey: string | null = null;
 	private scrollSaveTimer = 0;
 	private static readonly SCROLL_SAVE_MS = 500;
+	/** Longest note body rendered in the hover popup's scrollable preview. */
+	private static readonly PREVIEW_MAX_CHARS = 5000;
+	/** Task the hover popup was last filled for, so a late preview of another note is dropped. */
+	private popupTaskId: string | null = null;
 
 	constructor(controller: QueryController, containerEl: HTMLElement, private plugin: BasesGanttPlugin) {
 		super(controller);
@@ -272,6 +347,18 @@ export class GanttChartView extends BasesView {
 			if (!(evt.target as Element).closest('.today-button')) return;
 			evt.stopPropagation();
 			this.scrollToToday();
+		}, true);
+		// The popup is read-only: a click anywhere in it (checkboxes and links
+		// in the note preview included) opens the note instead. Capture phase,
+		// so it comes before Obsidian's own checkbox and link handlers.
+		this.registerDomEvent(this.ganttEl, 'click', (evt) => {
+			if (!(evt.target as Element).closest('.popup-wrapper')) return;
+			evt.preventDefault();
+			evt.stopPropagation();
+			const ganttTask = this.popupTaskId ? this.findTask(this.popupTaskId) : null;
+			if (ganttTask && !ganttTask.id.startsWith(GROUP_HEADER_PREFIX)) {
+				void this.app.workspace.openLinkText(ganttTask.filePath, '', false);
+			}
 		}, true);
 		this.registerDomEvent(this.ganttEl, 'mousedown', (evt) => {
 			this.mouseDownPos = { x: evt.clientX, y: evt.clientY };
@@ -777,6 +864,8 @@ export class GanttChartView extends BasesView {
 
 			// Rich hover popup
 			popup: (ctx: PopupContext) => {
+				// Read on every hover, so turning it off needs no rebuild.
+				if (this.config.get('showPopup') === false) return false;
 				this.renderPopup(ctx, showProgress);
 			},
 
@@ -848,6 +937,7 @@ export class GanttChartView extends BasesView {
 			this.gantt = savedScroll ? withoutInitialScroll(create) : create();
 			patchBarDateMath(this.gantt);
 			patchDragSnap(this.gantt);
+			patchPopup(this.gantt, () => this.fitPopup(), () => this.mouseDownPos !== null);
 		} catch (e) {
 			console.error('Bases Gantt: failed to initialize chart', e);
 			this.ganttEl.empty();
@@ -882,6 +972,9 @@ export class GanttChartView extends BasesView {
 	/** Render content inside Frappe Gantt's hover popup. */
 	private renderPopup(ctx: PopupContext, showProgress: boolean): void {
 		const ganttTask = this.findTask(ctx.task.id);
+		// The preview sits outside the parts Frappe refills, so drop the previous task's.
+		this.ganttEl.querySelector('.popup-wrapper .gantt-popup-preview')?.remove();
+		this.popupTaskId = ctx.task.id;
 
 		// Group headers: just show the label
 		if (!ganttTask || ganttTask.id.startsWith(GROUP_HEADER_PREFIX)) {
@@ -917,23 +1010,73 @@ export class GanttChartView extends BasesView {
 			);
 		}
 
-		if (ctx.task.dependencies) {
-			const depNames = ctx.task.dependencies.split(',')
-				.map(d => d.trim()).filter(Boolean)
-				.map(depId => {
-					const depTask = this.findTask(depId);
-					return escapeHtml(depTask ? depTask.label : depId);
-				});
-			if (depNames.length > 0) {
-				parts.push(`<div class="gantt-popup-deps">Depends on: ${depNames.join(', ')}</div>`);
-			}
+		// Frappe turns the comma-separated string into an array when it loads the tasks.
+		const deps: unknown = ctx.task.dependencies;
+		const depIds = Array.isArray(deps) ? deps as string[] : typeof deps === 'string' ? deps.split(',') : [];
+		const depNames = depIds
+			.map(d => d.trim()).filter(Boolean)
+			.map(depId => {
+				const depTask = this.findTask(depId);
+				return escapeHtml(depTask ? depTask.label : depId);
+			});
+		if (depNames.length > 0) {
+			parts.push(`<div class="gantt-popup-deps">Depends on: ${depNames.join(', ')}</div>`);
 		}
+
+		const props = this.renderPopupProperties(ganttTask);
+		if (props) parts.push(props);
 
 		parts.push(`<div class="gantt-popup-hint">Click to open &middot; Right-click for options</div>`);
 		ctx.set_details(parts.join(''));
 
 		// Async: render a markdown preview of the note body
-		void this.renderPopupPreview(ganttTask);
+		if (this.plugin.settings.showNotePreview) void this.renderPopupPreview(ganttTask);
+	}
+
+	/** The note properties chosen in the settings, as escaped HTML rows (null when there are none to show). */
+	private renderPopupProperties(ganttTask: GanttTask): string | null {
+		const wanted = this.plugin.settings.popupProperties;
+		if (wanted.length === 0) return null;
+		const file = this.app.vault.getFileByPath(ganttTask.filePath);
+		const frontmatter = file ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
+		if (!frontmatter) return null;
+		const keys = Object.keys(frontmatter);
+		const rows: string[] = [];
+		for (const name of wanted) {
+			// Property names are matched ignoring case, like Obsidian's own property names.
+			const key = keys.find((k) => k.toLowerCase() === name.toLowerCase());
+			if (!key) continue;
+			const text = formatPropertyValue(frontmatter[key]);
+			if (!text) continue;
+			rows.push(
+				`<span class="gantt-popup-prop-name">${escapeHtml(key)}</span>` +
+				`<span class="gantt-popup-prop-value">${escapeHtml(text)}</span>`
+			);
+		}
+		return rows.length > 0 ? `<div class="gantt-popup-props">${rows.join('')}</div>` : null;
+	}
+
+	/** Move the popup up / left as far as needed to show it whole inside the visible part of the chart. */
+	private fitPopup(): void {
+		const popup = this.ganttEl.querySelector<HTMLElement>('.popup-wrapper');
+		if (!popup || popup.classList.contains('hide') || !this.gantt) return;
+		const margin = 8;
+		const outer = this.ganttEl.getBoundingClientRect();
+		const inner = this.gantt.$container.getBoundingClientRect();
+		const visible = {
+			top: Math.max(outer.top, inner.top),
+			bottom: Math.min(outer.bottom, inner.bottom),
+			left: Math.max(outer.left, inner.left),
+			right: Math.min(outer.right, inner.right),
+		};
+		const rect = popup.getBoundingClientRect();
+		// Overflowing at the bottom/right moves it back; it never goes past the top/left.
+		let dy = Math.min(0, visible.bottom - margin - rect.bottom);
+		dy = Math.max(dy, visible.top + margin - rect.top);
+		let dx = Math.min(0, visible.right - margin - rect.right);
+		dx = Math.max(dx, visible.left + margin - rect.left);
+		if (dy) popup.style.top = `${parseFloat(popup.style.top || '0') + dy}px`;
+		if (dx) popup.style.left = `${parseFloat(popup.style.left || '0') + dx}px`;
 	}
 
 	/** Asynchronously render a truncated markdown preview in the popup. */
@@ -942,23 +1085,42 @@ export class GanttChartView extends BasesView {
 		if (!file) return;
 
 		const content = await this.app.vault.cachedRead(file);
+		// The popup may have moved on to another bar while the note was read.
+		if (this.popupTaskId !== ganttTask.id) return;
 
 		// Strip frontmatter
 		const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)/);
 		const body = bodyMatch ? bodyMatch[1].trim() : content.trim();
 		if (!body) return;
 
-		const preview = body.length > 300 ? body.substring(0, 300) + '...' : body;
+		// Scrollable, so most notes fit whole; only very long ones are cut, at a line break.
+		let preview = body;
+		if (body.length > GanttChartView.PREVIEW_MAX_CHARS) {
+			const cut = body.lastIndexOf('\n', GanttChartView.PREVIEW_MAX_CHARS);
+			preview = body.substring(0, cut > 0 ? cut : GanttChartView.PREVIEW_MAX_CHARS) + '\n\n…';
+		}
 
-		// Check popup is still visible
 		const popupEl = this.ganttEl.querySelector('.popup-wrapper');
-		if (!popupEl || popupEl.querySelector('.gantt-popup-preview')) return;
+		if (!popupEl) return;
+		popupEl.querySelector('.gantt-popup-preview')?.remove();
 
 		const previewDiv = document.createElement('div');
 		previewDiv.className = 'gantt-popup-preview';
 		popupEl.appendChild(previewDiv);
 
 		await MarkdownRenderer.render(this.app, preview, previewDiv, ganttTask.filePath, this);
+		if (this.popupTaskId !== ganttTask.id) {
+			previewDiv.remove();
+			return;
+		}
+		// The bottom fade hints at more text; it goes once scrolled to the end.
+		const updateFade = () => previewDiv.toggleClass(
+			'is-at-end', previewDiv.scrollTop + previewDiv.clientHeight >= previewDiv.scrollHeight - 1,
+		);
+		previewDiv.addEventListener('scroll', updateFade, { passive: true });
+		updateFade();
+		// The preview made the popup taller.
+		this.fitPopup();
 	}
 
 	/** Format a date for display in popups (shorter, human-friendly). */
@@ -1223,6 +1385,12 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 					displayName: 'Show expected progress',
 					default: false,
 					shouldHide: () => !(config.get('showProgress') as boolean),
+				},
+				{
+					type: 'toggle',
+					key: 'showPopup',
+					displayName: 'Show details on hover',
+					default: true,
 				},
 			],
 		},

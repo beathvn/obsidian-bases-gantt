@@ -123,6 +123,7 @@ export default class BasesGanttPlugin extends Plugin {
 		// Copied so assigning colors never mutates DEFAULT_SETTINGS.
 		this.settings.colorAssignments = { ...loaded?.colorAssignments };
 		this.settings.valueColors = [...(loaded?.valueColors ?? [])];
+		this.settings.popupProperties = [...(loaded?.popupProperties ?? [])];
 	}
 
 	async saveSettings() {

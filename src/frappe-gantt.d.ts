@@ -41,7 +41,8 @@ declare module 'frappe-gantt' {
 		lines?: 'both' | 'vertical' | 'horizontal' | 'none';
 		move_dependencies?: boolean;
 		padding?: number;
-		popup?: ((ctx: PopupContext) => void) | false;
+		/** Returning false keeps the popup from showing. */
+		popup?: ((ctx: PopupContext) => void | false) | false;
 		popup_on?: 'click' | 'hover';
 		readonly_progress?: boolean;
 		readonly_dates?: boolean;

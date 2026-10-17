@@ -201,6 +201,8 @@
 /* ── Rich hover popup ────────────────────────────────────────────── */
 
 .bases-gantt-view .popup-wrapper {
+	/* Above the sticky date header (z-index 1000), which would cover its top. */
+	z-index: 1010;
 	font-family: var(--font-interface);
 	border-radius: var(--radius-m);
 	border: 1px solid var(--background-modifier-border);
@@ -219,6 +221,12 @@
 	font-size: 12px;
 	color: var(--text-muted);
 	margin-top: 2px;
+}
+
+/* The hovered bar's date range in the header: a light tint, so the
+   month/day labels on top of it stay readable. */
+.bases-gantt-view .gantt-container .date-range-highlight {
+	background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
 /* Progress bar inside popup */
@@ -258,6 +266,23 @@
 	margin-top: 4px;
 }
 
+.gantt-popup-props {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 2px 8px;
+	font-size: 11px;
+	margin-top: 6px;
+}
+
+.gantt-popup-prop-name {
+	color: var(--text-muted);
+}
+
+.gantt-popup-prop-value {
+	color: var(--text-normal);
+	overflow-wrap: anywhere;
+}
+
 .gantt-popup-hint {
 	font-size: 10px;
 	color: var(--text-faint);
@@ -272,19 +297,26 @@
 	font-size: 12px;
 	line-height: 1.5;
 	color: var(--text-normal);
-	max-height: 120px;
-	overflow: hidden;
-	position: relative;
+	max-height: 160px;
+	overflow-y: auto;
+	/* Scrolling past either end doesn't scroll the chart behind. */
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+	/* Fades out the bottom edge of the scroll area while there's more below. */
+	mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent);
 }
 
-.gantt-popup-preview::after {
-	content: '';
-	position: absolute;
-	bottom: 0;
-	left: 0;
-	right: 0;
-	height: 28px;
-	background: linear-gradient(transparent, var(--background-primary));
+.gantt-popup-preview.is-at-end {
+	mask-image: none;
+}
+
+/* Read-only: clicks open the note (see the popup click handler). */
+.bases-gantt-view .popup-wrapper {
+	cursor: pointer;
+}
+
+.gantt-popup-preview input[type='checkbox'],
+.gantt-popup-preview a {
 	pointer-events: none;
 }
 

@@ -15,6 +15,10 @@ export interface BasesGanttSettings {
 	colorAssignments: Record<string, Record<string, number>>;
 	/** Colors fixed for specific values of the color-by property; other values use the palette. */
 	valueColors: ValueColor[];
+	/** Note properties listed in the hover popup, in this order. */
+	popupProperties: string[];
+	/** Show a preview of the note's content in the hover popup. */
+	showNotePreview: boolean;
 }
 
 export interface ValueColor {
@@ -28,6 +32,8 @@ export const DEFAULT_SETTINGS: BasesGanttSettings = {
 	defaultDurationDays: 91,
 	colorAssignments: {},
 	valueColors: [],
+	popupProperties: [],
+	showNotePreview: true,
 };
 
 export class BasesGanttSettingTab extends PluginSettingTab {
@@ -71,6 +77,27 @@ export class BasesGanttSettingTab extends PluginSettingTab {
 						for (const view of GanttChartView.instances) view.onDataUpdated();
 					});
 			});
+
+		new Setting(containerEl)
+			.setName('Properties on hover')
+			.setDesc('Note properties to show when you hover over a bar, separated by commas. Properties a note doesn\'t have are left out.')
+			.addText((text) => text
+				.setPlaceholder('status, owner, priority')
+				.setValue(this.plugin.settings.popupProperties.join(', '))
+				.onChange(async (value) => {
+					this.plugin.settings.popupProperties = value.split(',').map((p) => p.trim()).filter(Boolean);
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Note preview on hover')
+			.setDesc('Show a scrollable preview of the note\'s content in the hover popup.')
+			.addToggle((toggle) => toggle
+				.setValue(this.plugin.settings.showNotePreview)
+				.onChange(async (value) => {
+					this.plugin.settings.showNotePreview = value;
+					await this.plugin.saveSettings();
+				}));
 
 		new Setting(containerEl)
 			.setName('Value colors')
