@@ -15,7 +15,7 @@ import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, GROUP_HEADER_PREFIX, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
-import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll } from './zoom';
+import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll } from './zoom';
 import type BasesGanttPlugin from './main';
 
 // ── Drag moves the whole dependency chain ──
@@ -107,20 +107,41 @@ function patchBarDateMath(gantt: Gantt): void {
 }
 
 /**
- * Snap the bar under the mouse to whole weeks when zoomed out past days
- * (Frappe's snap_at is fixed per chart, but the zoom changes live).
+ * Snap the bars being dragged to whole weeks when zoomed out past days
+ * (Frappe's snap_at is fixed per chart, but the zoom changes live). A bar's
+ * start is placed by the calendar mapping, where a week isn't a fixed number
+ * of pixels in Month/Year zoom, so a moved start snaps to the x of its new
+ * date; that is where the bar is redrawn once released. Width follows the
+ * uniform 30-day-month math, so a resized end snaps in whole-week pixels.
  */
 function patchDragSnap(gantt: Gantt): void {
 	const g = gantt as unknown as {
+		$svg: SVGElement;
+		bars: FrappeBar[];
 		config: { column_width: number; step: number; unit: string };
 		get_snap_position(dx: number, ox: number): number;
 	};
 	const original = g.get_snap_position.bind(g);
+	// Capture phase, so this runs before Frappe's own mousedown handler.
+	let resizingEnd = false;
+	g.$svg.addEventListener('mousedown', (evt) => {
+		resizingEnd = (evt.target as Element).classList.contains('right');
+	}, true);
 	g.get_snap_position = (dx, ox) => {
 		const { column_width, step, unit } = g.config;
 		const pxPerDay = column_width / (step * DAYS_PER_UNIT[unit]);
 		const snap = dragSnapDays(pxPerDay);
 		if (snap === 1) return original(dx, ox);
+		if (!resizingEnd) {
+			const bar = g.bars.find((b) => b.$bar.ox === ox);
+			if (bar) {
+				// task._start moves along during the drag; the origin holds the pre-drag date.
+				const origin = bar.dragOrigin;
+				const start = origin && origin.ox === ox && origin.owidth === bar.$bar.owidth ? origin.start : bar.task._start;
+				const days = Math.round(dayShiftForX(gantt, start, dx) / snap) * snap;
+				return xForDate(gantt, addDays(start, days)) - ox;
+			}
+		}
 		const pxPerSnap = snap * pxPerDay;
 		return Math.round(dx / pxPerSnap) * pxPerSnap;
 	};

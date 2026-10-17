@@ -223,9 +223,14 @@ function unitsBetween(a: Date, b: Date, unit: string): number {
 	return ms / (unit === 'hour' ? 3_600_000 : DAY_MS);
 }
 
-function xForDate(g: FrappeInternals, date: Date): number {
+function xForDateInternal(g: FrappeInternals, date: Date): number {
 	const { column_width, step, unit } = g.config;
 	return (unitsBetween(date, g.gantt_start, unit) / step) * column_width;
+}
+
+/** Where Frappe draws a bar starting on `date`. */
+export function xForDate(gantt: Gantt, date: Date): number {
+	return xForDateInternal(internals(gantt), date);
 }
 
 function dateForX(g: FrappeInternals, x: number): Date {
@@ -306,7 +311,7 @@ export function drawQuarterBackdrop(gantt: Gantt): void {
  */
 export function dayShiftForX(gantt: Gantt, start: Date, dx: number): number {
 	const g = internals(gantt);
-	const from = xForDate(g, start);
+	const from = xForDateInternal(g, start);
 	const target = from + dx;
 	const estimate = Math.round((dateForX(g, target).getTime() - dateForX(g, from).getTime()) / DAY_MS);
 	let best = estimate;
@@ -314,7 +319,7 @@ export function dayShiftForX(gantt: Gantt, start: Date, dx: number): number {
 	for (const offset of [0, -1, 1, -2, 2, -3, 3]) {
 		const d = new Date(start);
 		d.setDate(d.getDate() + estimate + offset);
-		const error = Math.abs(xForDate(g, d) - target);
+		const error = Math.abs(xForDateInternal(g, d) - target);
 		if (error < bestError - 0.01) {
 			best = estimate + offset;
 			bestError = error;
@@ -500,7 +505,7 @@ export class ZoomController {
 			this.onRendered();
 		}
 		const { column_width } = g.config;
-		const columnStart = Math.floor(xForDate(g, now) / column_width) * column_width;
+		const columnStart = Math.floor(xForDateInternal(g, now) / column_width) * column_width;
 		g.$container.scrollTo({ left: columnStart - column_width / 6, behavior: 'smooth' });
 	}
 
@@ -528,7 +533,7 @@ export class ZoomController {
 		const gantt = this.getGantt();
 		if (!gantt) return;
 		const g = internals(gantt);
-		g.$container.scrollLeft = xForDate(g, date);
+		g.$container.scrollLeft = xForDateInternal(g, date);
 	}
 
 	destroy(): void {
@@ -569,6 +574,6 @@ export class ZoomController {
 		} finally {
 			delete (g as unknown as Record<string, unknown>).set_scroll_position;
 		}
-		g.$container.scrollLeft = xForDate(g, anchor) - anchorX;
+		g.$container.scrollLeft = xForDateInternal(g, anchor) - anchorX;
 	}
 }
