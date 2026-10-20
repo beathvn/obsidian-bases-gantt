@@ -1,6 +1,6 @@
 # Colors
 
-With **Color by** set, each value of that property gets its own color. Colors stay stable as values come and go, and specific values can be given a fixed color. Without Color by, every bar uses the theme's accent color.
+With **Color by** set, each value of that property gets its own color. Colors stay stable as values come and go, and specific values can be given a fixed color. When Color by isn't set, a text property named like `status`, `priority`, `type`, `category`, `phase` or `stage` is used ([Task mapping](task-mapping.md)). Without one, every bar uses the theme's accent color.
 
 ## Rules
 

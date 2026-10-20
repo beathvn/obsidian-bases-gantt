@@ -29,7 +29,7 @@ export interface ValueColor {
 
 export const DEFAULT_SETTINGS: BasesGanttSettings = {
 	moveDependentTasks: true,
-	defaultDurationDays: 91,
+	defaultDurationDays: 1,
 	colorAssignments: {},
 	valueColors: [],
 	popupProperties: [],

@@ -76,7 +76,7 @@ The Gantt chart reads frontmatter properties from your notes. Here's what it can
 | Property | What it does | Example |
 |----------|-------------|---------|
 | **Planned start** | When you plan to (re)start working on it, e.g. a project you started long ago and pick up again next month. The bar then begins here; the start date stays as the record of when it began. | `plannedStart: 2026-11-02` |
-| **End date** | When the task ends. If omitted, the bar is drawn with a default length (91 days, adjustable in the plugin settings). | `end-date: 2026-03-05` |
+| **End date** | When the task ends. If omitted, the bar is drawn with a default length (1 day, adjustable in the plugin settings). | `end-date: 2026-03-05` |
 | **Progress** | Completion percentage (0–100). Enables the progress bar on the task. Can also be a formula, e.g. [computed from the note's tasks](#progress-from-task-counts). | `progress: 40` |
 | **Dependencies** | Wiki-links to notes that must finish first. Shows arrows between bars. | `depends-on: "[[Design]]"` |
 | **Status / Priority / etc.** | Any text property can be used to color-code the bars. | `status: In Progress` |
@@ -90,8 +90,9 @@ You don't have to use the exact names above. The plugin auto-detects properties 
 - **End date:** `end`, `due`, `finish`, `deadline`, `until`
 - **Progress:** `progress`, `percent`, `completion`, `complete`, `done` (number properties only)
 - **Dependencies:** `depends`, `blocks`, `after`, `prerequisite`, `requires` (text or link properties only)
+- **Color by:** `status`, `priority`, `type`, `category`, `phase`, `stage` (text properties only)
 
-So `due-date`, `deadline`, `finish-date`, etc. all work as end dates without any configuration. Progress and dependencies are only guessed when the start date isn't set in the view settings either. A property named `plannedStart` is used as the [planned start](#configuring-the-view) automatically.
+So `due-date`, `deadline`, `finish-date`, etc. all work as end dates without any configuration. Progress, dependencies and Color by are only guessed when the start date isn't set in the view settings either. A property named `plannedStart` is used as the [planned start](#configuring-the-view) automatically.
 
 ### Dependencies
 
@@ -143,7 +144,7 @@ Instead of typing a percentage, you can compute progress from the checkboxes in 
    The `if` keeps notes without any tasks at 0% instead of dividing by zero.
 4. In the Gantt view's settings, turn on **Show progress** and set **Progress** to the formula `progress`.
 
-The bars now fill up as you check off tasks. Progress computed by a formula is read-only on the chart; **Drag to set progress** only applies to a plain number property.
+The bars now fill up as you check off tasks. Progress computed by a formula is always read-only on the chart, so no handle appears; **Drag to set progress** only applies to a plain number property.
 
 ---
 
@@ -160,7 +161,7 @@ If auto-detection picks the wrong properties (or you want to override it), you c
 - **End date** — Which date property to use as the bar's end
 - **Label** — Which property to use as the bar's label (defaults to file name)
 - **Dependencies** — Which property contains dependency links
-- **Color by** — Which property to color-code bars by (e.g., `status` gives each status value a different color). Without it, all bars use your theme's accent color.
+- **Color by** — Which property to color-code bars by (e.g., `status` gives each status value a different color). If not set, a property like `status` or `priority` is picked automatically; without one, all bars use your theme's accent color.
 - **Progress** — Which numeric property represents completion (only visible when "Show progress" is on)
 
 ### Zooming
@@ -172,9 +173,9 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 - **Bar height** — How tall the task bars are (16–60 pixels)
 - **Show progress** — Toggle the progress bar overlay on tasks. Turns on by itself when a progress property is detected and you haven't set the toggle yet
 - **Show expected progress** — When progress is shown, adds a dashed line indicating where progress *should* be based on how much time has elapsed
-- **Drag to set progress** — When progress is shown, lets you change it on the chart by dragging a handle or from the right-click menu (off by default). Only works when **Progress** is a plain number property in the notes, not a formula
+- **Drag to set progress** — When progress is shown, lets you change it on the chart by dragging a handle or from the right-click menu (on by default). Only works when **Progress** is a plain number property in the notes, not a formula
 - **Show original start** — For bars that begin at a planned start, draw a faint dotted line back to the note's own start date
-- **Show details on hover** — Show a popup with the task's dates, progress, dependencies, chosen properties and a preview of the note when you hover over a bar (off by default)
+- **Show details on hover** — Show a popup with the task's dates, progress, dependencies, chosen properties and a preview of the note when you hover over a bar (on by default)
 
 ---
 
@@ -196,7 +197,7 @@ Opens the note in the current tab.
 Opens a context menu:
 - **Open note** — open in current tab
 - **Open in new tab** — open in a new tab
-- **Set progress** — quickly set to 0%, 25%, 50%, 75%, or 100% (only with **Drag to set progress** on)
+- **Set progress** — quickly set to 0%, 25%, 50%, 75%, or 100% (unless **Drag to set progress** is off)
 - **Scroll to today** — jump the chart to today's date
 
 ### Right-click empty space
@@ -218,10 +219,10 @@ If enabled, shows a popup with:
 - The properties chosen under **Properties on hover** in the plugin settings
 - A scrollable, read-only preview of the note's content (can be turned off in the plugin settings)
 
-Turn it on with **Show details on hover** in the view's Display options. Click the popup to open the note.
+Turn it off with **Show details on hover** in the view's Display options. Click the popup to open the note.
 
 ### Drag the progress handle
-With **Show progress** and **Drag to set progress** on, a small handle appears at the end of the progress fill. Drag it to change the completion percentage; the new value is written to the note and can be undone.
+With **Show progress** on (and **Drag to set progress** not turned off), a small handle appears at the end of the progress fill. Drag it to change the completion percentage; the new value is written to the note and can be undone.
 
 ---
 
@@ -236,7 +237,7 @@ If you configure **grouping** in the view (e.g., group by `status`), the Gantt c
 Under **Settings → Community plugins → Bases Gantt**:
 
 - **Move dependent tasks along** — When you drag a task, shift every task that depends on it by the same amount. Turn off to keep dependent tasks fixed in place.
-- **Default length without end date** — How many days a task without an end date is drawn (default 91).
+- **Default length without end date** — How many days a task without an end date is drawn (default 1).
 - **Properties on hover** — Note properties to show in the hover popup, separated by commas (e.g. `status, owner, priority`).
 - **Note preview on hover** — Show a preview of the note's content in the hover popup (on by default).
 - **Value colors** — Give specific values of the **Color by** property a fixed color (e.g. `done` → green). Matching ignores case. Values not listed here get a color automatically, which they keep while the value is in use, so adding new values never recolors existing bars. Automatic colors skip any palette color that looks like one you fixed.

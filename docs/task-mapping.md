@@ -7,8 +7,8 @@ Each note in the base becomes one bar. Its start, end, label, dependencies, prog
 `GanttChartView.getTaskMapperConfig()` uses the properties set under **Configure view → Properties**. Unset ones are auto-detected by name (`autoDetectProperties()`):
 
 - **Start / end:** date properties whose names contain `start`, `end`, `due`, … Otherwise the first and second date properties. An end property that is empty in every note is still found by name. `file.*` dates and the planned start are never used.
-- **Dependencies, progress:** by keyword, only when the start isn't configured either.
-- **Color by, planned start:** never guessed by keyword (see [Colors](colors.md) and [Planned start](planned-start.md)).
+- **Dependencies, progress, Color by:** by keyword, only when the start isn't configured either.
+- **Planned start:** never guessed by keyword, only a property named `plannedStart` ([Planned start](planned-start.md)).
 
 ## Mapping
 

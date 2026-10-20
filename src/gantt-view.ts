@@ -439,12 +439,13 @@ export class GanttChartView extends BasesView {
 
 	/**
 	 * The frontmatter key progress is written to, or null while it's read-only:
-	 * "Drag to set progress" off, progress hidden, or computed (a formula, e.g.
-	 * from task counts, can't be written).
+	 * "Drag to set progress" turned off, progress hidden, or computed (a
+	 * formula, e.g. from task counts, can't be written). On unless turned off,
+	 * as in the original plugin.
 	 */
 	private editableProgressProperty(): string | null {
 		const config = this.getTaskMapperConfig();
-		if (this.config.get('editProgress') !== true || !config.showProgress) return null;
+		if (this.config.get('editProgress') === false || !config.showProgress) return null;
 		const property = config.progressProperty;
 		return property && isNoteProperty(property) ? this.extractPropertyName(property) : null;
 	}
@@ -750,8 +751,7 @@ export class GanttChartView extends BasesView {
 		let endProperty = this.config.getAsPropertyId('endDate');
 		let labelProperty = this.config.getAsPropertyId('label');
 		let dependenciesProperty = this.config.getAsPropertyId('dependencies');
-		// Never auto-detected: without "Color by" all bars use the accent color.
-		const colorByProperty = this.config.getAsPropertyId('colorBy');
+		let colorByProperty = this.config.getAsPropertyId('colorBy');
 		let progressProperty = this.config.getAsPropertyId('progress');
 		// Without configuring it, a note property named "plannedStart" is used.
 		const plannedStartProperty = this.config.getAsPropertyId('plannedStart')
@@ -766,6 +766,7 @@ export class GanttChartView extends BasesView {
 				startProperty = detected.start;
 				dependenciesProperty = dependenciesProperty ?? detected.dependencies;
 				progressProperty = progressProperty ?? detected.progress;
+				colorByProperty = colorByProperty ?? detected.colorBy;
 			}
 			// The end is also detected when only the start was configured,
 			// but never as the configured start itself.
@@ -795,10 +796,11 @@ export class GanttChartView extends BasesView {
 		end: BasesPropertyId | null;
 		dependencies: BasesPropertyId | null;
 		progress: BasesPropertyId | null;
+		colorBy: BasesPropertyId | null;
 	} {
 		const entries = this.data?.data;
 		if (!entries || entries.length === 0) {
-			return { start: null, end: null, dependencies: null, progress: null };
+			return { start: null, end: null, dependencies: null, progress: null, colorBy: null };
 		}
 
 		// Classify each property by the first entry that has a value for it: a
@@ -873,7 +875,11 @@ export class GanttChartView extends BasesView {
 		const progressKeywords = ['progress', 'percent', 'completion', 'complete', 'done'];
 		const progress = findByKeywords(numberProps, progressKeywords);
 
-		return { start, end, dependencies, progress };
+		// Color by: text properties with category-like names
+		const colorKeywords = ['status', 'priority', 'type', 'category', 'phase', 'stage'];
+		const colorBy = findByKeywords(stringProps, colorKeywords);
+
+		return { start, end, dependencies, progress, colorBy };
 	}
 
 	private getDisplayConfigSnapshot(): string {
@@ -936,8 +942,8 @@ export class GanttChartView extends BasesView {
 			// Rich hover popup
 			popup: (ctx: PopupContext) => {
 				// Read on every hover, so turning it off needs no rebuild.
-				// Off unless turned on in the view's Display options.
-				if (this.config.get('showPopup') !== true) return false;
+				// On unless turned off in the view's Display options.
+				if (this.config.get('showPopup') === false) return false;
 				this.renderPopup(ctx, showProgress);
 			},
 
@@ -1560,7 +1566,7 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 					type: 'toggle',
 					key: 'editProgress',
 					displayName: 'Drag to set progress',
-					default: false,
+					default: true,
 					shouldHide: () => !(config.get('showProgress') as boolean),
 				},
 				{
@@ -1573,7 +1579,7 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 					type: 'toggle',
 					key: 'showPopup',
 					displayName: 'Show details on hover',
-					default: false,
+					default: true,
 				},
 			],
 		},
