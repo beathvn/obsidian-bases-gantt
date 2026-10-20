@@ -1,6 +1,6 @@
 # Dragging
 
-Drag a bar to move it, or drag its left or right edge to change its start or end. The new dates are written to the note's frontmatter, once per drag.
+Drag a bar to move it, or drag its left or right edge to change its start or end. The new dates are written to the note's frontmatter, once per drag. Progress can be dragged too, when the view allows it ([Progress](progress.md)).
 
 ## Flow
 

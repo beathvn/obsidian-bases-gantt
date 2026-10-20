@@ -7,6 +7,7 @@ These docs are organized **by feature: one page per feature**. Each page briefly
 - [Task mapping](task-mapping.md): notes → bars, auto-detection, dependencies
 - [Zoom](zoom.md): continuous zoom, persisted per device
 - [Dragging](dragging.md): moving and resizing bars, snapping, dependents, undo
+- [Progress](progress.md): progress from numbers or formulas, optional editing
 - [Open-ended tasks](open-ended-tasks.md): tasks without an end date
 - [Planned start](planned-start.md): projects picked up again later
 - [Colors](colors.md): stable automatic colors and fixed value colors

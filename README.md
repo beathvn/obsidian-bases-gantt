@@ -77,7 +77,7 @@ The Gantt chart reads frontmatter properties from your notes. Here's what it can
 |----------|-------------|---------|
 | **Planned start** | When you plan to (re)start working on it, e.g. a project you started long ago and pick up again next month. The bar then begins here; the start date stays as the record of when it began. | `plannedStart: 2026-11-02` |
 | **End date** | When the task ends. If omitted, the bar is drawn with a default length (91 days, adjustable in the plugin settings). | `end-date: 2026-03-05` |
-| **Progress** | Completion percentage (0–100). Enables the progress bar on the task. | `progress: 40` |
+| **Progress** | Completion percentage (0–100). Enables the progress bar on the task. Can also be a formula, e.g. [computed from the note's tasks](#progress-from-task-counts). | `progress: 40` |
 | **Dependencies** | Wiki-links to notes that must finish first. Shows arrows between bars. | `depends-on: "[[Design]]"` |
 | **Status / Priority / etc.** | Any text property can be used to color-code the bars. | `status: In Progress` |
 | **Label** | Override the displayed name (defaults to the file name). | `label: "Phase 1 Research"` |
@@ -88,10 +88,10 @@ You don't have to use the exact names above. The plugin auto-detects properties 
 
 - **Start date:** `start`, `begin`, `from`, `created`
 - **End date:** `end`, `due`, `finish`, `deadline`, `until`
-- **Progress:** `progress`, `percent`, `completion`, `complete`, `done`
-- **Dependencies:** `depends`, `blocks`, `after`, `prerequisite`, `requires`
+- **Progress:** `progress`, `percent`, `completion`, `complete`, `done` (number properties only)
+- **Dependencies:** `depends`, `blocks`, `after`, `prerequisite`, `requires` (text or link properties only)
 
-So `due-date`, `deadline`, `finish-date`, etc. all work as end dates without any configuration.
+So `due-date`, `deadline`, `finish-date`, etc. all work as end dates without any configuration. Progress and dependencies are only guessed when the start date isn't set in the view settings either. A property named `plannedStart` is used as the [planned start](#configuring-the-view) automatically.
 
 ### Dependencies
 
@@ -113,6 +113,37 @@ start-date: 2026-03-15
 end-date: 2026-03-15
 ---
 ```
+
+### Progress from task counts
+
+Instead of typing a percentage, you can compute progress from the checkboxes in each note. One way is the [Task Count](https://github.com/anareaty/task-count) community plugin, which writes the number of tasks in a note into its properties, plus a Bases formula that turns them into a percentage.
+
+1. Install and enable **Task Count**. By default it counts into the properties `tasks` (all tasks) and `tasks_completed` (checked ones); the names can be changed in its settings.
+2. Add those properties to each note you want counted. Task Count only fills in notes that already have at least one of them:
+
+   ```yaml
+   ---
+   start-date: 2026-04-09
+   end-date: 2026-04-18
+   tasks:
+   tasks_completed:
+   ---
+   - [x] Set up the database
+   - [ ] Write the API
+   ```
+
+   With automatic updates on (Task Count's default) the numbers follow as you check tasks off; otherwise run its **Update task count** command.
+3. Add a formula to the base that calculates the percentage, here named `progress`. In the `.base` file it looks like this:
+
+   ```yaml
+   formulas:
+     progress: if(tasks > 0, tasks_completed / tasks * 100, 0)
+   ```
+
+   The `if` keeps notes without any tasks at 0% instead of dividing by zero.
+4. In the Gantt view's settings, turn on **Show progress** and set **Progress** to the formula `progress`.
+
+The bars now fill up as you check off tasks. Progress computed by a formula is read-only on the chart; **Drag to set progress** only applies to a plain number property.
 
 ---
 
@@ -139,8 +170,9 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 ### Display Section
 
 - **Bar height** — How tall the task bars are (16–60 pixels)
-- **Show progress** — Toggle the progress bar overlay on tasks
+- **Show progress** — Toggle the progress bar overlay on tasks. Turns on by itself when a progress property is detected and you haven't set the toggle yet
 - **Show expected progress** — When progress is shown, adds a dashed line indicating where progress *should* be based on how much time has elapsed
+- **Drag to set progress** — When progress is shown, lets you change it on the chart by dragging a handle or from the right-click menu (off by default). Only works when **Progress** is a plain number property in the notes, not a formula
 - **Show original start** — For bars that begin at a planned start, draw a faint dotted line back to the note's own start date
 - **Show details on hover** — Show a popup with the task's dates, progress, dependencies, chosen properties and a preview of the note when you hover over a bar (off by default)
 
@@ -151,8 +183,11 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 ### Drag a bar left/right
 Reschedules the task — changes the start and end dates. The dates are written back to the note's frontmatter automatically. Tasks that depend on it move along by the same amount (this can be turned off in the plugin settings). Drags snap to whole days when the chart shows day columns, and to whole weeks when zoomed out further.
 
-### Drag the right edge of a bar
-Resizes the task — changes the end date while keeping the start date fixed. On a task without an end date, this sets one.
+### Drag the left or right edge of a bar
+Resizes the task — the right edge changes the end date, the left edge the start date. On a task without an end date, dragging the right edge sets one.
+
+### Undo
+Every drag shows a notice with an **Undo** button. The **Undo last change** command reverts the most recent drags too, up to 20 back. A drag that also moved dependent tasks is undone as one step.
 
 ### Click a bar
 Opens the note in the current tab.
@@ -161,7 +196,7 @@ Opens the note in the current tab.
 Opens a context menu:
 - **Open note** — open in current tab
 - **Open in new tab** — open in a new tab
-- **Set progress** — quickly set to 0%, 25%, 50%, 75%, or 100%
+- **Set progress** — quickly set to 0%, 25%, 50%, 75%, or 100% (only with **Drag to set progress** on)
 - **Scroll to today** — jump the chart to today's date
 
 ### Right-click empty space
@@ -169,7 +204,10 @@ Opens a context menu:
 - **Scroll to today**
 
 ### Click an empty date column
-Creates a new task at that specific date.
+Creates a new task starting on that date. Works from Week zoom inwards, where the day under the pointer is highlighted; at Month and Year zoom a day is too narrow to aim at.
+
+### Today button
+The **Today** button in the chart's corner scrolls to today's date.
 
 ### Hover over a bar
 If enabled, shows a popup with:
@@ -183,7 +221,7 @@ If enabled, shows a popup with:
 Turn it on with **Show details on hover** in the view's Display options. Click the popup to open the note.
 
 ### Drag the progress handle
-If "Show progress" is enabled, a small handle appears inside the bar. Drag it to change the completion percentage.
+With **Show progress** and **Drag to set progress** on, a small handle appears at the end of the progress fill. Drag it to change the completion percentage; the new value is written to the note and can be undone.
 
 ---
 
@@ -212,6 +250,7 @@ All commands are available via `Cmd/Ctrl + P`:
 | Command | What it does |
 |---------|-------------|
 | **Gantt: Scroll to today** | Jumps the chart to today's date |
+| **Gantt: Undo last change** | Reverts the most recent drag |
 | **Gantt: Create new task** | Creates a new note with today's date pre-filled |
 | **Gantt: Zoom in** / **Zoom out** | Zoom around the center of the chart |
 | **Gantt: Day view** | Jump to day-level zoom |

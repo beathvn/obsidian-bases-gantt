@@ -17,7 +17,7 @@ Registered in `main.ts`. Each one acts on the Gantt view in the active leaf, or 
 | Action | Result |
 |---|---|
 | Click a bar | Open the note. Ignored if the mouse moved, which counts as a drag. |
-| Right-click a bar | Open note · Open in new tab · Scroll to today |
+| Right-click a bar | Open note · Open in new tab · Set progress 0–100 % (with **Drag to set progress**, see [Progress](progress.md)) · Scroll to today |
 | Right-click empty space | Create new task · Scroll to today |
 | Left-click an empty date column | New note starting (and ending) on that date. Only from Week zoom on, where the day under the pointer is highlighted. |
 

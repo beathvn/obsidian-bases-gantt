@@ -60,8 +60,10 @@
 	transition: fill 0.2s ease, stroke 0.2s ease, opacity 0.2s ease;
 }
 
+/* No width transition: dragging the progress handle sets the width on every
+   mousemove, and restarting a transition each time made the fill trail the pointer. */
 .bases-gantt-view .gantt .bar-progress {
-	transition: fill 0.2s ease, width 0.15s ease;
+	transition: fill 0.2s ease;
 }
 
 .bases-gantt-view .gantt .bar-wrapper {

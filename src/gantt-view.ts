@@ -437,6 +437,43 @@ export class GanttChartView extends BasesView {
 		if (this.gantt) this.gantt.options.move_dependencies = this.plugin.settings.moveDependentTasks;
 	}
 
+	/**
+	 * The frontmatter key progress is written to, or null while it's read-only:
+	 * "Drag to set progress" off, progress hidden, or computed (a formula, e.g.
+	 * from task counts, can't be written).
+	 */
+	private editableProgressProperty(): string | null {
+		const config = this.getTaskMapperConfig();
+		if (this.config.get('editProgress') !== true || !config.showProgress) return null;
+		const property = config.progressProperty;
+		return property && isNoteProperty(property) ? this.extractPropertyName(property) : null;
+	}
+
+	/** Write a task's progress (0–100) with undo, from the progress handle or the context menu. */
+	private setProgress(task: GanttTask, progress: number): void {
+		const propName = this.editableProgressProperty();
+		if (!propName) return;
+		const pct = Math.max(0, Math.min(100, Math.round(progress)));
+		// From the note, not task.progress: Frappe works on our task objects
+		// and has already set the new value there when on_progress_change fires.
+		const file = this.app.vault.getFileByPath(task.filePath);
+		const stored = Number(file ? this.app.metadataCache.getFileCache(file)?.frontmatter?.[propName] : NaN);
+		const previous = Number.isFinite(stored) ? Math.round(stored) : 0;
+		if (pct === previous) {
+			// Nothing to write, so no data update redraws the dragged bar: put it back.
+			this.onDataUpdated();
+			return;
+		}
+		const batch: UndoBatch = {
+			description: `Set progress of "${task.label}" to ${pct}%`,
+			changes: [{ filePath: task.filePath, previous: { [propName]: previous }, next: { [propName]: pct } }],
+		};
+		void this.writeFrontmatter(task.filePath, batch.changes[0].next);
+		this.undoStack.push(batch);
+		if (this.undoStack.length > GanttChartView.MAX_UNDO_ENTRIES) this.undoStack.shift();
+		this.showUndoNotice(batch.description);
+	}
+
 	/** Public: scroll chart to today (for command palette). */
 	scrollToToday(): void {
 		this.zoom.scrollToToday();
@@ -844,6 +881,8 @@ export class GanttChartView extends BasesView {
 			barHeight: this.config.get('barHeight'),
 			showProgress: this.config.get('showProgress'),
 			showExpectedProgress: this.config.get('showExpectedProgress'),
+			// Frappe reads readonly_progress when it draws the bars.
+			editProgress: this.config.get('editProgress'),
 		});
 	}
 
@@ -878,7 +917,8 @@ export class GanttChartView extends BasesView {
 			scroll_to: earliestDate || 'today',
 			readonly: false,
 			readonly_dates: false,
-			readonly_progress: true,
+			// Frappe only draws the progress handle when this is false.
+			readonly_progress: this.editableProgressProperty() == null,
 			// Drag in whole days at every zoom (Frappe's Month and Year modes
 			// otherwise snap to 7- and 30-day steps).
 			snap_at: '1d',
@@ -943,6 +983,13 @@ export class GanttChartView extends BasesView {
 
 				// Written once on mouseup by finishDrag(), not per tick.
 				this.recordDragChange(ganttTask.filePath, `Moved "${ganttTask.label}"`, previous, updates);
+			},
+
+			// Fired once, on release of the progress handle.
+			on_progress_change: (task, progress) => {
+				if (task.id.startsWith(GROUP_HEADER_PREFIX)) return;
+				const ganttTask = this.findTask(task.id);
+				if (ganttTask) this.setProgress(ganttTask, progress);
 			},
 
 			on_date_click: (dateStr: string) => {
@@ -1282,6 +1329,17 @@ export class GanttChartView extends BasesView {
 
 		menu.addSeparator();
 
+		if (this.editableProgressProperty()) {
+			for (const pct of [0, 25, 50, 75, 100]) {
+				menu.addItem((item) => {
+					item.setTitle(`Set progress: ${pct}%`)
+						.setChecked(Math.round(task.progress ?? 0) === pct)
+						.onClick(() => this.setProgress(task, pct));
+				});
+			}
+			menu.addSeparator();
+		}
+
 		menu.addItem((item) => {
 			item.setTitle('Scroll to today')
 				.setIcon('calendar')
@@ -1495,6 +1553,13 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 					type: 'toggle',
 					key: 'showExpectedProgress',
 					displayName: 'Show expected progress',
+					default: false,
+					shouldHide: () => !(config.get('showProgress') as boolean),
+				},
+				{
+					type: 'toggle',
+					key: 'editProgress',
+					displayName: 'Drag to set progress',
 					default: false,
 					shouldHide: () => !(config.get('showProgress') as boolean),
 				},
