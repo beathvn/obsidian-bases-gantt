@@ -82,7 +82,7 @@ The chart works with **whole days**. Use plain dates like `2026-03-01`. A time o
 | Property | What it does | Example |
 |----------|-------------|---------|
 | **End date** | When the task ends. If omitted, the bar is drawn with a default length (1 day, adjustable in the plugin settings). | `end-date: 2026-03-05` |
-| **Progress** | Completion percentage (0–100). Enables the progress bar on the task. Can also be a formula, e.g. [computed from the note's tasks](#progress-from-task-counts). | `progress: 40` |
+| **Progress** | Completion percentage (0–100). Enables the progress bar on the task. Can also be a formula, for example [computed from the note's checkboxes](#progress-from-checkboxes-optional-workflow). | `progress: 40` |
 | **Dependencies** | Wiki-links to notes that must finish first. Shows arrows between bars. | `depends-on: "[[Design]]"` |
 | **Status / Priority / etc.** | Any text property can be used to color-code the bars. | `status: In Progress` |
 | **Label** | Override the displayed name (defaults to the file name). | `label: "Phase 1 Research"` |
@@ -144,36 +144,48 @@ The bar now begins on 2 November 2026. The start date stays in the note as the r
 - A property named `plannedStart` is picked up automatically. To use another one, set **Planned start** under **Advanced** in the view settings.
 - The dotted line can be turned off with **Show original start** in the same group.
 
-### Progress from task counts
+### Progress in notes
 
-Instead of typing a percentage, you can compute progress from the checkboxes in each note. One way is the [Task Count](https://github.com/anareaty/task-count) community plugin, which writes the number of tasks in a note into its properties, plus a Bases formula that turns them into a percentage.
+The simple way: add a number from 0 to 100 to the note, and the bar fills to that percentage.
 
-1. Install and enable **Task Count**. By default it counts into the properties `tasks` (all tasks) and `tasks_completed` (checked ones); the names can be changed in its settings.
-2. Add those properties to each note you want counted. Task Count only fills in notes that already have at least one of them:
+```yaml
+progress: 40
+```
 
-   ```yaml
-   ---
-   start-date: 2026-04-09
-   end-date: 2026-04-18
-   tasks:
-   tasks_completed:
-   ---
-   - [x] Set up the database
-   - [ ] Write the API
-   ```
+Turn on **Show progress** in the view settings (it turns itself on when a progress property is found). You can then also drag the progress handle on the bar, or use the right-click menu, to change the number.
 
-   With automatic updates on (Task Count's default) the numbers follow as you check tasks off; otherwise run its **Update task count** command.
-3. Add a formula to the base that calculates the percentage, here named `progress`. In the `.base` file it looks like this:
+### Progress from checkboxes (optional workflow)
 
-   ```yaml
-   formulas:
-     progress: if(tasks > 0, tasks_completed / tasks * 100, 0)
-   ```
+> [!TIP]
+> This is an example of using Gantt for Bases together with another plugin, not a feature of this plugin. The [Task Count](https://github.com/anareaty/task-count) plugin counts the checkboxes in your notes, and a Bases formula turns that into the progress shown on the bars. Skip it if `progress: 40` is enough for you.
 
-   The `if` keeps notes without any tasks at 0% instead of dividing by zero.
-4. In the Gantt view's settings, turn on **Show progress** and set **Progress** to the formula `progress`.
+**Step 1: let Task Count count.** Install and enable it. Then add two empty properties to each note you want counted, because Task Count only fills in notes that already have them:
 
-The bars now fill up as you check off tasks. Progress computed by a formula is always read-only on the chart, so no handle appears; **Drag to set progress** only applies to a plain number property.
+```yaml
+---
+start-date: 2026-04-09
+end-date: 2026-04-18
+tasks:
+tasks_completed:
+---
+- [x] Set up the database
+- [ ] Write the API
+```
+
+With its default settings the numbers update as you check items off. Otherwise run its **Update task count** command.
+
+**Step 2: add the formula.** In the `.base` file, add a formula that calculates the percentage, here named `progress`:
+
+```yaml
+formulas:
+  progress: if(tasks > 0, tasks_completed / tasks * 100, 0)
+```
+
+The `if` keeps notes without any tasks at 0% instead of dividing by zero. If you changed the property names in Task Count's settings, use those names here.
+
+**Step 3: show it.** In the Gantt view's settings, turn on **Show progress** and set **Progress** to the formula `progress`.
+
+The bars now fill as you check off tasks. Because the percentage is calculated, it is read-only on the chart: no handle appears, and **Drag to set progress** only works for a plain number property.
 
 ---
 

@@ -9,7 +9,8 @@ With **Show progress** on, each bar is filled to the note's completion percentag
 | Number in the note | `progress: 40` | unless **Drag to set progress** is off |
 | Formula | `if(tasks > 0, tasks_completed / tasks * 100, 0)` | never |
 
-The formula example uses the [Task Count](https://github.com/anareaty/task-count) plugin, which writes `tasks` and `tasks_completed` into notes that have those properties. The README has the full setup.
+> [!TIP]
+> Progress can also come from a formula, for example with the [Task Count](https://github.com/anareaty/task-count) plugin, which counts the checkboxes in your notes. The README shows the setup.
 
 ## View options
 
