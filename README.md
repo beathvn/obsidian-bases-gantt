@@ -83,7 +83,7 @@ The chart works with **whole days**. Use plain dates like `2026-03-01`. A time o
 |----------|-------------|---------|
 | **End date** | When the task ends. If omitted, the bar is drawn with a default length (1 day, adjustable in the plugin settings). | `end-date: 2026-03-05` |
 | **Progress** | Completion percentage (0–100). Enables the progress bar on the task. Can also be a formula, for example [computed from the note's checkboxes](#progress-from-checkboxes-optional-workflow). | `progress: 40` |
-| **Dependencies** | Wiki-links to notes that must finish first. Shows arrows between bars. | `depends-on: "[[Design]]"` |
+| **Dependencies** | Wiki-links to notes that must finish first. Shows arrows between bars. [How it works](#dependencies) | `depends-on: "[[Design]]"` |
 | **Status / Priority / etc.** | Any text property can be used to color-code the bars. | `status: In Progress` |
 | **Label** | Override the displayed name (defaults to the file name). | `label: "Phase 1 Research"` |
 
@@ -101,17 +101,24 @@ So `due-date`, `deadline`, `finish-date`, etc. all work as end dates without any
 
 ### Dependencies
 
-To link tasks with dependency arrows, add a property with wiki-links to other notes:
+The arrows between bars come from a property in your notes. You add them by editing the note, not by drawing on the chart.
+
+Say "Build" can only start after "Design" is done. In the **Build** note, add a property that links to Design:
 
 ```yaml
-depends-on: "[[Task A]], [[Task B]]"
+---
+start-date: 2026-03-10
+depends-on: "[[Design]]"
+---
 ```
 
-**The property always lists the notes this one waits for.** Here Task A and Task B have to come first, and the arrows run from them to this task. Put the link on the *later* task.
+An arrow now runs from Design to Build. To wait for several notes, list them: `depends-on: "[[Task A]], [[Task B]]"`.
 
-So a property that says the opposite, like `blocks: "[[Task C]]"` ("this task holds up Task C"), would draw its arrows backwards. That's why `blocks` is **not** picked up automatically. If you track your tasks that way, move the link to the later task as `depends-on` (or `blocked-by`) instead. If you pick a property like `blocks` yourself under **Dependencies** in the view settings, it is still read as "waits for".
-
-You can also use plain comma-separated names (without wiki-link brackets), but wiki-links are recommended because Obsidian will keep them updated if you rename notes.
+- **Put the link on the later task.** The property lists the notes *this one waits for*.
+- **Any property name works.** Names like `depends-on`, `blocked-by` or `after` are found automatically. Otherwise choose it under **Dependencies** in the view settings.
+- **Not `blocks`.** `blocks` says the opposite ("this task holds up Task C"), so its arrows would point backwards and it is not picked up automatically. Move the link to the later task as `depends-on` instead.
+- **Links to notes outside the base** are ignored, and so are links to notes in a different group.
+- Plain comma-separated names work too, but `[[links]]` are better, because Obsidian keeps them up to date when you rename a note.
 
 ### One-day tasks
 
@@ -402,6 +409,8 @@ The dependencies property must list the notes **this one waits for**, so put it 
 - Make sure the dependency property uses wiki-link syntax: `depends-on: "[[Other Note]]"`
 - The linked note must also appear on the chart (it needs a start date)
 - Check that "Dependencies" is set to the correct property in view settings
+- If the base is grouped, both notes must be in the same group
+- Arrows are made by editing the note, not by drawing on the chart: see [Dependencies](#dependencies)
 
 ---
 
