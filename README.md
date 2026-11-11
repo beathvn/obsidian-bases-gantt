@@ -202,7 +202,6 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 - **Show progress** — Toggle the progress bar overlay on tasks. Turns on by itself when a progress property is detected and you haven't set the toggle yet
 - **Show expected progress** — When progress is shown, adds a dashed line indicating where progress *should* be based on how much time has elapsed
 - **Drag to set progress** — When progress is shown, lets you change it on the chart by dragging a handle or from the right-click menu (on by default). Only works when **Progress** is a plain number property in the notes, not a formula
-- **Show details on hover** — Show a popup with the task's dates, progress, dependencies, chosen properties and a preview of the note when you hover over a bar (on by default)
 
 ### Advanced
 
@@ -253,7 +252,7 @@ If enabled, shows a popup with:
 - The properties chosen under **Properties on hover** in the plugin settings
 - A scrollable, read-only preview of the note's content (can be turned off in the plugin settings)
 
-Turn it off with **Show details on hover** in the view's Display options. Click the popup to open the note.
+Everything about the popup is under **Hover** in the plugin settings, including **Show details on hover** to turn it off. Click the popup to open the note.
 
 ### Drag the progress handle
 With **Show progress** on (and **Drag to set progress** not turned off), a small handle appears at the end of the progress fill. Drag it to change the completion percentage; the new value is written to the note and can be undone.
@@ -272,9 +271,11 @@ Under **Settings → Community plugins → Gantt for Bases**:
 
 - **Move dependent tasks along** — Off by default, so dragging a task only changes that task. Turn on to shift every task that depends on it by the same amount too; those notes' dates are rewritten as well, and one Undo reverts them all.
 - **Default length without end date** — How many days a task without an end date is drawn (default 1).
-- **Properties on hover** — Note properties to show in the hover popup, separated by commas (e.g. `status, owner, priority`).
-- **Note preview on hover** — Show a preview of the note's content in the hover popup (on by default).
-- **Value colors** — Give specific values of the **Color by** property a fixed color (e.g. `done` → green). Matching ignores case. Values not listed here get a color automatically, which they keep while the value is in use, so adding new values never recolors existing bars. Automatic colors skip any palette color that looks like one you fixed. Up to 32 values can have a fixed color.
+- **Hover** — Everything about the popup that appears when you rest on a bar lives here, not in the view:
+  - **Show details on hover** — Turn the popup on or off (on by default).
+  - **Properties on hover** — Note properties to show in it, separated by commas (e.g. `status, owner, priority`).
+  - **Note preview on hover** — Show a preview of the note's content in it (on by default).
+- **Value colors** — Give specific values of the view's **Color by** property a fixed color (e.g. `done` → green). Matching ignores case. Values not listed here get a color automatically, which they keep while the value is in use, so adding new values never recolors existing bars. Automatic colors skip any palette color that looks like one you fixed. Up to 32 values can have a fixed color.
 
 ---
 

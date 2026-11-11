@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BasesViewConfig } from 'obsidian';
 import { loadedPlugin } from './support/plugin';
-import { DEFAULT_SETTINGS } from '../src/settings';
+import { DEFAULT_SETTINGS, GanttForBasesSettingTab } from '../src/settings';
 import { getGanttViewOptions, moveDescription } from '../src/gantt-view';
 
 describe('plugin settings', () => {
@@ -11,7 +11,7 @@ describe('plugin settings', () => {
 	});
 
 	it('leaves dependent tasks in place and draws open-ended tasks one day long by default', () => {
-		expect(DEFAULT_SETTINGS).toMatchObject({ moveDependentTasks: false, defaultDurationDays: 1, showNotePreview: true });
+		expect(DEFAULT_SETTINGS).toMatchObject({ moveDependentTasks: false, defaultDurationDays: 1, showNotePreview: true, showPopup: true });
 	});
 
 	it('moves dependent tasks along when the setting was turned on', async () => {
@@ -44,7 +44,7 @@ describe('view options', () => {
 	it('keeps the planned start options out of the main groups, in an Advanced group', () => {
 		expect(items().map((g) => [g.displayName, g.items.map((i) => i.displayName)])).toEqual([
 			['Properties', ['Start date', 'End date', 'Label', 'Dependencies', 'Color by', 'Progress']],
-			['Display', ['Bar height', 'Show progress', 'Show expected progress', 'Drag to set progress', 'Show details on hover']],
+			['Display', ['Bar height', 'Show progress', 'Show expected progress', 'Drag to set progress']],
 			['Advanced', ['Planned start', 'Show original start']],
 		]);
 	});
@@ -61,7 +61,6 @@ describe('view options', () => {
 		['showProgress', false],
 		['editProgress', true],
 		['showOriginalStart', true],
-		['showPopup', true],
 		['barHeight', 30],
 	])('defaults %s to %s', (key, value) => {
 		expect(item(key).default).toBe(value);
@@ -79,5 +78,25 @@ describe('drag notice wording', () => {
 
 	it('does not mention the planned start when only the end was resized', () => {
 		expect(moveDescription('Design', { startsPlanned: true, startMoved: false })).toBe('Moved "Design"');
+	});
+});
+
+describe('plugin settings tab', () => {
+	type Def = { name?: string; heading?: string; items?: Def[]; control?: { key: string } };
+
+	it('keeps every hover option together in one Hover group', async () => {
+		const plugin = await loadedPlugin();
+		const tab = new GanttForBasesSettingTab({} as never, plugin);
+		const hover = (tab.getSettingDefinitions() as unknown as Def[]).find((d) => d.heading === 'Hover');
+		expect(hover?.items?.map((i) => [i.name, i.control?.key])).toEqual([
+			['Show details on hover', 'showPopup'],
+			['Properties on hover', 'popupProperties'],
+			['Note preview on hover', 'showNotePreview'],
+		]);
+	});
+
+	it('stores whether the hover popup is shown', async () => {
+		const plugin = await loadedPlugin({ showPopup: false });
+		expect(plugin.settings.showPopup).toBe(false);
 	});
 });

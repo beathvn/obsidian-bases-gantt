@@ -940,8 +940,8 @@ export class GanttChartView extends BasesView {
 			// Rich hover popup
 			popup: (ctx: PopupContext) => {
 				// Read on every hover, so turning it off needs no rebuild.
-				// On unless turned off in the view's Display options.
-				if (this.config.get('showPopup') === false) return false;
+				// On unless turned off in the plugin settings.
+				if (!this.plugin.settings.showPopup) return false;
 				this.renderPopup(ctx, showProgress);
 			},
 
@@ -1566,12 +1566,6 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 					displayName: 'Drag to set progress',
 					default: true,
 					shouldHide: () => !(config.get('showProgress') as boolean),
-				},
-				{
-					type: 'toggle',
-					key: 'showPopup',
-					displayName: 'Show details on hover',
-					default: true,
 				},
 			],
 		},

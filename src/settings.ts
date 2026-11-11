@@ -16,6 +16,8 @@ export interface GanttForBasesSettings {
 	colorAssignments: Record<string, Record<string, number>>;
 	/** Colors fixed for specific values of the color-by property; other values use the palette. */
 	valueColors: ValueColor[];
+	/** Show the popup when resting on a bar. */
+	showPopup: boolean;
 	/** Note properties listed in the hover popup, in this order. */
 	popupProperties: string[];
 	/** Show a preview of the note's content in the hover popup. */
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: GanttForBasesSettings = {
 	defaultDurationDays: 1,
 	colorAssignments: {},
 	valueColors: [],
+	showPopup: true,
 	popupProperties: [],
 	showNotePreview: true,
 };
@@ -66,20 +69,31 @@ export class GanttForBasesSettingTab extends PluginSettingTab {
 				},
 			},
 			{
-				name: 'Properties on hover',
-				desc: 'Note properties to show when you hover over a bar, separated by commas. Properties a note doesn\'t have are left out.',
-				control: { type: 'text', key: 'popupProperties', placeholder: 'Example: status, owner, priority' },
-			},
-			{
-				name: 'Note preview on hover',
-				desc: 'Show a scrollable preview of the note\'s content in the hover popup.',
-				control: { type: 'toggle', key: 'showNotePreview' },
+				type: 'group',
+				heading: 'Hover',
+				items: [
+					{
+						name: 'Show details on hover',
+						desc: 'Show a popup with the task\'s dates, progress and dependencies when you rest the pointer on a bar. The two settings below only apply while this is on.',
+						control: { type: 'toggle', key: 'showPopup' },
+					},
+					{
+						name: 'Properties on hover',
+						desc: 'Note properties to show in the popup, separated by commas. Properties a note doesn\'t have are left out.',
+						control: { type: 'text', key: 'popupProperties', placeholder: 'Example: status, owner, priority' },
+					},
+					{
+						name: 'Note preview on hover',
+						desc: 'Show a scrollable preview of the note\'s content in the popup.',
+						control: { type: 'toggle', key: 'showNotePreview' },
+					},
+				],
 			},
 			{
 				type: 'list',
 				heading: 'Value colors',
 				cls: 'gantt-for-bases-value-colors',
-				emptyState: `Give specific values of the color-by property a fixed color (matched ignoring case), up to ${MAX_FIXED_COLORS}. Values not listed here get a color automatically.`,
+				emptyState: `Give specific values of the view's Color by property a fixed color (matched ignoring case), up to ${MAX_FIXED_COLORS}. Values not listed here get a color automatically.`,
 				items: valueColors.map((entry) => ({
 					name: entry.value || 'New value',
 					render: (setting) => {
