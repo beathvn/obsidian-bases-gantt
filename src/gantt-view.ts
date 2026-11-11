@@ -1057,12 +1057,8 @@ export class GanttChartView extends BasesView {
 		// On unless turned off in the view's options.
 		const showOriginalStart = this.config.get('showOriginalStart') !== false;
 		drawQuarterBackdrop(this.gantt);
-		// Milestone class can't be combined with the color class in
-		// custom_class: Frappe Gantt throws on spaces in classList.add.
 		for (const task of this.currentTasks) {
 			if (task.originalStart && showOriginalStart) this.drawOriginalStart(task);
-			if (!task.isMilestone) continue;
-			this.ganttEl.querySelector(`.bar-wrapper[data-id="${task.id}"]`)?.classList.add('gantt-milestone');
 		}
 	}
 

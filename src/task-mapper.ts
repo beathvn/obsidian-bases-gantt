@@ -12,7 +12,6 @@ export interface GanttTask extends FrappeTask {
 	/** Unescaped label, for plain-text uses (notices, textContent). */
 	label: string;
 	filePath: string;
-	isMilestone?: boolean;
 	/** False when the note has no end date and `end` is the display default. */
 	hasEnd: boolean;
 	/** The bar starts at the note's planned start, so drags move that and leave the start date alone. */
@@ -167,8 +166,6 @@ export function mapEntriesToTasks(
 		// the bar: a task starting and ending on the same day is one day long.
 		// Default: if no end date, show the task with the configured length
 		const hasEnd = endDate != null;
-		// A note that really ends on its start day is a milestone.
-		const isMilestone = endDate != null && endDate.getTime() === startDate.getTime();
 		if (!endDate) {
 			endDate = new Date(startDate);
 			endDate.setDate(endDate.getDate() + Math.max(1, config.defaultDurationDays) - 1);
@@ -246,16 +243,6 @@ export function mapEntriesToTasks(
 			}
 		}
 
-		// Milestone: start === end → a one-day bar styled as a marker
-		if (isMilestone) {
-			// Note: custom_class must NOT contain spaces — classList.add() in
-			// Frappe Gantt's bar.refresh() throws DOMException on spaces.
-			// Use only a single class; milestone styling is secondary to color.
-			if (!custom_class) {
-				custom_class = 'gantt-milestone';
-			}
-		}
-
 		tasks.push({
 			id: makeTaskId(entry.file.path),
 			name: escapeHtml(name),
@@ -266,7 +253,6 @@ export function mapEntriesToTasks(
 			dependencies,
 			custom_class,
 			filePath: entry.file.path,
-			isMilestone,
 			hasEnd,
 			startsPlanned: plannedStart != null,
 			originalStart,

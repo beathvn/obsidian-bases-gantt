@@ -4,7 +4,7 @@ These docs are organized **by feature: one page per feature**. Each page briefly
 
 ## Features
 
-- [Task mapping](task-mapping.md): notes → bars, auto-detection, dependencies, milestones, grouping, empty state
+- [Task mapping](task-mapping.md): notes → bars, auto-detection, dependencies, one-day tasks, grouping, empty state
 - [Zoom](zoom.md): continuous zoom, persisted per device
 - [Timeline](timeline.md): header labels and week numbers, weekend and quarter shading, today, where the chart opens, theme
 - [Dragging](dragging.md): moving and resizing bars, snapping, dependents, undo, clicks vs. drags
@@ -52,7 +52,7 @@ flowchart LR
 1. `getTaskMapperConfig()` resolves the properties (configured or auto-detected).
 2. `mapEntriesToTasks()` builds the tasks, per group when the base is grouped.
 3. If the config snapshot is unchanged, the chart is refreshed in place, keeping the scroll position. Otherwise it is rebuilt (`initGantt`).
-4. `afterRender()` finishes what Frappe draws: it removes Frappe's bar grow animations and adds the quarter backdrop, milestone classes and original-start lines.
+4. `afterRender()` finishes what Frappe draws: it removes Frappe's bar grow animations and adds the quarter backdrop and original-start lines.
 
 Rebuilds are skipped while a bar is being dragged and run once it ends.
 

@@ -66,28 +66,24 @@ describe('mapEntriesToTasks: bars', () => {
 
 	it('draws an end before the start as one day long', () => {
 		const [task] = map([entry('A.md', { start: '2025-01-10', end: '2025-01-01' })]);
-		expect(task).toMatchObject({ start: '2025-01-10', end: '2025-01-10', isMilestone: false });
+		expect(task).toMatchObject({ start: '2025-01-10', end: '2025-01-10' });
 	});
 });
 
-describe('mapEntriesToTasks: milestones', () => {
-	it('marks a task ending on its start day as a one-day milestone', () => {
+describe('mapEntriesToTasks: tasks on a single day', () => {
+	it('draws a task ending on its start day as a plain one-day task', () => {
 		const [task] = map([entry('A.md', { start: '2025-01-10', end: '2025-01-10' })]);
-		expect(task).toMatchObject({ isMilestone: true, end: '2025-01-10', custom_class: 'gantt-milestone' });
+		expect(task).toMatchObject({ start: '2025-01-10', end: '2025-01-10', custom_class: '' });
+		expect(task).not.toHaveProperty('isMilestone');
 	});
 
-	it('keeps the color class of a colored milestone', () => {
+	it('keeps the color class of a colored one-day task', () => {
 		const [task] = mapEntriesToTasks(
 			[entry('A.md', { start: '2025-01-10', end: '2025-01-10', status: 'done' })],
 			config({ colorByProperty: 'note.status' }),
 			() => ({ slot: 3 }),
 		);
 		expect(task.custom_class).toBe('gantt-color-3');
-	});
-
-	it('does not mark a longer task', () => {
-		const [task] = map([entry('A.md', { start: '2025-01-10', end: '2025-01-12' })]);
-		expect(task.isMilestone).toBe(false);
 	});
 });
 

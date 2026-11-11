@@ -34,12 +34,11 @@ describe('open-ended tasks', () => {
 		expect(map({ start: '2025-01-01' }, { defaultDurationDays: 1 })).toMatchObject({
 			end: '2025-01-01',
 			hasEnd: false,
-			isMilestone: false,
 		});
 	});
 
-	it('is not a milestone with a zero-day default length', () => {
+	it('draws a zero-day default length as one day', () => {
 		const task = map({ start: '2025-01-01' }, { defaultDurationDays: 0 });
-		expect(task).toMatchObject({ end: '2025-01-01', hasEnd: false, isMilestone: false });
+		expect(task).toMatchObject({ end: '2025-01-01', hasEnd: false });
 	});
 });

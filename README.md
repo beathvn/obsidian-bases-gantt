@@ -105,9 +105,9 @@ depends-on: "[[Task A]], [[Task B]]"
 
 You can also use plain comma-separated names (without wiki-link brackets), but wiki-links are recommended because Obsidian will keep them updated if you rename notes.
 
-### Milestones
+### One-day tasks
 
-If a task's start and end date are the same, it renders as a **milestone** — a compact marker on the timeline:
+A task that starts and ends on the same day is drawn as a one-day bar:
 
 ```yaml
 ---
@@ -353,7 +353,7 @@ Ship it!
 This will show:
 - **Planning** and **Design** as completed bars
 - **Backend** and **Frontend** running in parallel, both depending on Design
-- **Launch** as a milestone at the end, depending on both Backend and Frontend
+- **Launch** as a one-day bar at the end, depending on both Backend and Frontend
 - Dependency arrows connecting them
 - Color-coded bars if you set "Color by" to `status`
 
