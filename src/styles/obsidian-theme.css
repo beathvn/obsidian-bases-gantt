@@ -16,7 +16,6 @@
 	--g-progress-color: var(--interactive-accent-hover);
 	--g-handle-color: var(--text-normal);
 	--g-weekend-label-color: var(--background-secondary-alt);
-	--g-expected-progress: var(--background-modifier-border);
 	--g-header-background: var(--background-primary);
 	--g-row-color: var(--background-primary);
 	--g-row-border-color: var(--background-modifier-border);

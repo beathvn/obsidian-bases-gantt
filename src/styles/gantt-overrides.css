@@ -102,13 +102,6 @@
 	pointer-events: none;
 }
 
-/* ── Expected progress line ──────────────────────────────────────── */
-
-.gantt-for-bases-view .gantt .bar-expected-progress {
-	opacity: 0.35;
-	stroke-dasharray: 4 2;
-}
-
 /* ── Day hover / click target ────────────────────────────────────── */
 
 /* One transparent rect over the grid takes the clicks that create a task;

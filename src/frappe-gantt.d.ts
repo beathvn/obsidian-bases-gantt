@@ -50,7 +50,6 @@ declare module 'frappe-gantt' {
 		hover_on_date?: boolean;
 		fixed_duration?: boolean;
 		scroll_to?: string | Date | null;
-		show_expected_progress?: boolean;
 		today_button?: boolean;
 		view_mode?: string;
 		view_mode_select?: boolean;

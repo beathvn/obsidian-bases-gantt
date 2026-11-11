@@ -44,16 +44,16 @@ describe('view options', () => {
 	it('keeps the planned start options out of the main groups, in an Advanced group', () => {
 		expect(items().map((g) => [g.displayName, g.items.map((i) => i.displayName)])).toEqual([
 			['Properties', ['Start date', 'End date', 'Label', 'Dependencies', 'Color by', 'Progress']],
-			['Display', ['Bar height', 'Show progress', 'Show expected progress', 'Drag to set progress']],
+			['Display', ['Bar height', 'Show progress', 'Drag to set progress']],
 			['Advanced', ['Planned start', 'Show original start']],
 		]);
 	});
 
-	it.each(['progress', 'showExpectedProgress', 'editProgress'])('hides %s while Show progress is off', (key) => {
+	it.each(['progress', 'editProgress'])('hides %s while Show progress is off', (key) => {
 		expect(item(key, { showProgress: false }).shouldHide!()).toBe(true);
 	});
 
-	it.each(['progress', 'showExpectedProgress', 'editProgress'])('shows %s while Show progress is on', (key) => {
+	it.each(['progress', 'editProgress'])('shows %s while Show progress is on', (key) => {
 		expect(item(key, { showProgress: true }).shouldHide!()).toBe(false);
 	});
 

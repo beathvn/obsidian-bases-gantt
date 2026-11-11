@@ -17,10 +17,9 @@ The formula example uses the [Task Count](https://github.com/anareaty/task-count
 |---|---|
 | Show progress | Draws the fill. Unset, it turns on by itself once a progress property is found. |
 | Progress | The property. Unset, a number property named like `progress`, `percent` or `done` is detected, only when the start isn't configured either ([Task mapping](task-mapping.md)). |
-| Show expected progress | Frappe's dashed marker for how far along the task should be by today. |
 | Drag to set progress | On by default. Shows the progress handle and the **Set progress** menu items. Turn it off when another tool owns the number. |
 
-Show expected progress and Drag to set progress are hidden while Show progress is off.
+Drag to set progress is hidden while Show progress is off. There is no "expected progress" marker: it would sit exactly where the Today line crosses the bar.
 
 ## Mapping
 

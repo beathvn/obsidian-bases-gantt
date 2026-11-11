@@ -200,7 +200,6 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 
 - **Bar height** — How tall the task bars are (16–60 pixels)
 - **Show progress** — Toggle the progress bar overlay on tasks. Turns on by itself when a progress property is detected and you haven't set the toggle yet
-- **Show expected progress** — When progress is shown, adds a dashed line indicating where progress *should* be based on how much time has elapsed
 - **Drag to set progress** — When progress is shown, lets you change it on the chart by dragging a handle or from the right-click menu (on by default). Only works when **Progress** is a plain number property in the notes, not a formula
 
 ### Advanced

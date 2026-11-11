@@ -884,7 +884,6 @@ export class GanttChartView extends BasesView {
 		return JSON.stringify({
 			barHeight: this.config.get('barHeight'),
 			showProgress: this.config.get('showProgress'),
-			showExpectedProgress: this.config.get('showExpectedProgress'),
 			// Frappe reads readonly_progress when it draws the bars.
 			editProgress: this.config.get('editProgress'),
 		});
@@ -909,7 +908,6 @@ export class GanttChartView extends BasesView {
 
 		const barHeight = (this.config.get('barHeight') as number) || 30;
 		const showProgress = (this.config.get('showProgress') as boolean) ?? false;
-		const showExpectedProgress = (this.config.get('showExpectedProgress') as boolean) ?? false;
 
 		// Calculate earliest task date to scroll to
 		const earliestDate = this.getEarliestTaskDate(tasks);
@@ -933,7 +931,6 @@ export class GanttChartView extends BasesView {
 			arrow_curve: 15,
 			auto_move_label: true,
 			move_dependencies: this.plugin.settings.moveDependentTasks,
-			show_expected_progress: showExpectedProgress && showProgress,
 			hover_on_date: true,
 			popup_on: 'hover',
 
@@ -1552,13 +1549,6 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 					key: 'showProgress',
 					displayName: 'Show progress',
 					default: false,
-				},
-				{
-					type: 'toggle',
-					key: 'showExpectedProgress',
-					displayName: 'Show expected progress',
-					default: false,
-					shouldHide: () => !(config.get('showProgress') as boolean),
 				},
 				{
 					type: 'toggle',
