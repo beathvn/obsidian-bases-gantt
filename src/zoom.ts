@@ -13,7 +13,8 @@ const DAY_MS = 86_400_000;
 export const DAYS_PER_UNIT: Record<string, number> = { hour: 1 / 24, day: 1, month: 30, year: 365 };
 
 export const MIN_PX_PER_DAY = 0.12;
-export const MAX_PX_PER_DAY = 320;
+/** The finest zoom: a day column about 80px wide. Notes only have dates, so there is nothing finer to show. */
+export const MAX_PX_PER_DAY = 80;
 
 interface ZoomBand {
 	mode: string;
@@ -28,8 +29,6 @@ const ZOOM_BANDS: ZoomBand[] = [
 	{ mode: 'Month', daysPerColumn: 30, minPxPerDay: 1 }, // 30–120px
 	{ mode: 'Week', daysPerColumn: 7, minPxPerDay: 4 }, // 28–154px
 	{ mode: 'Day', daysPerColumn: 1, minPxPerDay: 22 }, // 22–80px
-	{ mode: 'Half Day', daysPerColumn: 0.5, minPxPerDay: 80 }, // 40–80px
-	{ mode: 'Quarter Day', daysPerColumn: 0.25, minPxPerDay: 160 }, // 40–80px
 ];
 
 /** Zoom presets of the "… view" commands, and the default zoom (Day). */
@@ -175,8 +174,6 @@ function createViewModes(getPxPerDay: () => number): FrappeViewMode[] {
 			},
 		},
 		{ ...BASE_MODES.DAY },
-		{ ...BASE_MODES.HALF_DAY },
-		{ ...BASE_MODES.QUARTER_DAY },
 	];
 }
 

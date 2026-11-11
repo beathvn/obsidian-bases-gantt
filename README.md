@@ -67,6 +67,10 @@ That's it! The plugin automatically detects which properties are dates and maps 
 
 The Gantt chart reads frontmatter properties from your notes. Here's what it can use:
 
+### Dates only
+
+The chart works with **whole days**. Use plain dates like `2026-03-01`. A time of day (`2026-03-01 14:00`) is ignored when drawing, bars always start and end on day boundaries, and the finest zoom is one day per column. Dragging a bar writes the new dates back as plain `YYYY-MM-DD`, so a time stored in the property is dropped.
+
 ### Required
 
 | Property | What it does | Example |
@@ -186,7 +190,7 @@ If auto-detection picks the wrong properties (or you want to override it), you c
 
 ### Zooming
 
-Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoothly from hours out to years. The date under the pointer stays in place, and the header switches between day, week, month and year columns as you zoom. Zoom level and scroll position are remembered per view on each device, without touching the `.base` file.
+Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoothly from single days out to years. The date under the pointer stays in place, and the header switches between day, week, month and year columns as you zoom. Zoom level and scroll position are remembered per view on each device, without touching the `.base` file.
 
 ### Display Section
 

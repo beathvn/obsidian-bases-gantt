@@ -10,7 +10,8 @@ Pinch, Ctrl/Cmd + scroll, or the zoom commands change one continuous value: **pi
 | 1–4 | Month | 30 days |
 | 4–22 | Week | 7 days |
 | 22–80 | Day | 1 day |
-| ≥ 80 | Half / Quarter Day | 12 h / 6 h |
+
+80 px/day is the maximum (`MAX_PX_PER_DAY`). Notes only hold dates, so there are no half-day or quarter-day modes: bars always cover whole days.
 
 `column_width = pxPerDay × days per column`, so crossing a band only swaps grid lines and header labels. Bars stay where they were.
 

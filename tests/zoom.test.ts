@@ -24,6 +24,11 @@ describe('clampZoom', () => {
 	it('limits zooming in', () => {
 		expect(clampZoom(10_000)).toBe(MAX_PX_PER_DAY);
 	});
+
+	it('stops zooming in at whole-day columns, as notes only have dates', () => {
+		expect(MAX_PX_PER_DAY).toBe(80);
+		expect(controllerAt(MAX_PX_PER_DAY).ganttOptions().view_mode).toBe('Day');
+	});
 });
 
 describe('zoom bands', () => {
@@ -34,8 +39,7 @@ describe('zoom bands', () => {
 		[4, 'Week', 7],
 		[21.9, 'Week', 7],
 		[22, 'Day', 1],
-		[80, 'Half Day', 0.5],
-		[200, 'Quarter Day', 0.25],
+		[80, 'Day', 1],
 	])('at %s px/day shows %s columns of %s days', (pxPerDay, mode, days) => {
 		const options = controllerAt(pxPerDay).ganttOptions();
 		expect(options.view_mode).toBe(mode);
