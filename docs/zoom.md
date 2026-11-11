@@ -49,4 +49,4 @@ Events are batched to one render per animation frame. The date under the pointer
 
 ## Persistence
 
-Zoom and scroll position are saved per device in local storage, keyed by `<base path>::<view name>`.Without saved state, a view opens at Day zoom.
+Zoom and scroll position are saved per device in local storage, keyed by `<base path>::<view name>`, half a second after scrolling stops and when the view closes. The 100 most recently used views are kept (`MAX_SCROLL_STATES`). Without saved state, a view opens at Day zoom on its earliest task ([Timeline](timeline.md#where-the-chart-opens)).

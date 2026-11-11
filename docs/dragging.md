@@ -46,7 +46,16 @@ Frappe's `get_all_dependent_tasks` only finds direct dependents, so it is patche
 
 ## Undo
 
-One drag, including its dependents, is one undo batch holding each note's previous values. Undo is available from the Notice and the **Undo last change** command, up to 20 deep (`MAX_UNDO_ENTRIES`).
+One drag, including its dependents, is one undo batch holding each note's previous values. Undo is available from the Notice and the **Undo last change** command, up to 20 deep (`MAX_UNDO_ENTRIES`). [Progress](progress.md) edits go on the same stack.
+
+- **Collecting:** Frappe fires `on_date_change` on every day boundary crossed, so `recordDragChange()` keeps the first previous values and the latest new values per note. `finishDrag()` writes them once, on mouseup.
+- **No-op drags:** a note whose new values equal its previous ones (dragged out and back) is dropped. If nothing is left, nothing is written and no Notice appears.
+- **Notice:** shown for 6 seconds with an **Undo** button, e.g. `Moved "Design" (+2 dependent)`. Undoing shows `Undid: …`, or `Nothing to undo.` on an empty stack.
+- The stack lives in the open view: it is lost when the view closes.
+
+## Clicks vs. drags
+
+Frappe fires a click on a bar after any release, including a drag that snapped back without changing a date. The view records the mousedown position, and a release more than 4 px away (`CLICK_SLOP_PX`) counts as a drag, so it doesn't open the note. Pressing a bar also cancels a [hover popup](hover-popup.md) about to show.
 
 ## What gets written
 

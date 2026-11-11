@@ -4,9 +4,10 @@ These docs are organized **by feature: one page per feature**. Each page briefly
 
 ## Features
 
-- [Task mapping](task-mapping.md): notes → bars, auto-detection, dependencies
+- [Task mapping](task-mapping.md): notes → bars, auto-detection, dependencies, milestones, grouping, empty state
 - [Zoom](zoom.md): continuous zoom, persisted per device
-- [Dragging](dragging.md): moving and resizing bars, snapping, dependents, undo
+- [Timeline](timeline.md): header labels and week numbers, weekend and quarter shading, today, where the chart opens, theme
+- [Dragging](dragging.md): moving and resizing bars, snapping, dependents, undo, clicks vs. drags
 - [Progress](progress.md): progress from numbers or formulas, optional editing
 - [Open-ended tasks](open-ended-tasks.md): tasks without an end date
 - [Planned start](planned-start.md): projects picked up again later
@@ -73,7 +74,7 @@ Frappe has few extension points, so behavior is changed by replacing methods:
 
 ## Tests
 
-Tests use [Vitest](https://vitest.dev) in a jsdom environment: `npm test` runs them once, `npm run test:watch` keeps them running. They live in `tests/`, one file per feature page above (`tests/zoom.test.ts` for [Zoom](zoom.md), …), plus `date-utils.test.ts` and `commands.test.ts`. CI runs them after the build and lint.
+Tests use [Vitest](https://vitest.dev) in a jsdom environment: `npm test` runs them once, `npm run test:watch` keeps them running. They live in `tests/`, one file per feature page whose logic runs outside Obsidian (`tests/zoom.test.ts` for [Zoom](zoom.md), …), plus `date-utils.test.ts` and `commands.test.ts`. CI runs them after the build and lint.
 
 - **`obsidian` stand-in:** the `obsidian` package only ships types, so `vitest.config.mts` aliases it to `tests/support/obsidian.ts`, a few minimal classes (`DateValue`, `Plugin`, `debounce`, …).
 - **Helpers:** `entry()` and `config()` (`tests/support/entries.ts`) build Bases entries and mapper configs, `loadedPlugin()` a plugin with given stored settings, `chartAt()` the part of a Frappe chart its date ↔ x math reads.
