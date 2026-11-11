@@ -29,7 +29,7 @@ export interface ValueColor {
 }
 
 export const DEFAULT_SETTINGS: GanttForBasesSettings = {
-	moveDependentTasks: true,
+	moveDependentTasks: false,
 	defaultDurationDays: 1,
 	colorAssignments: {},
 	valueColors: [],
@@ -50,7 +50,7 @@ export class GanttForBasesSettingTab extends PluginSettingTab {
 		return [
 			{
 				name: 'Move dependent tasks along',
-				desc: 'When you drag a task, shift every task that depends on it by the same amount. Turn off to keep dependent tasks fixed in place.',
+				desc: 'Off by default: dragging a task only changes that task. Turn on to shift every task that depends on it by the same amount too, which rewrites the dates of those notes.',
 				control: { type: 'toggle', key: 'moveDependentTasks' },
 			},
 			{

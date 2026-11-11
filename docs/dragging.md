@@ -46,7 +46,7 @@ In Month and Year view a week isn't a fixed number of pixels, because of the cal
 
 ## Dependent tasks
 
-Frappe's `get_all_dependent_tasks` only finds direct dependents, so it is patched to walk the whole chain. Whether dependents move along at all is the plugin setting **Move dependent tasks along** (`options.move_dependencies`), applied to open charts without a rebuild.
+Frappe's `get_all_dependent_tasks` only finds direct dependents, so it is patched to walk the whole chain. Whether dependents move along at all is the plugin setting **Move dependent tasks along** (`options.move_dependencies`), off by default and applied to open charts without a rebuild.
 
 ## Undo
 

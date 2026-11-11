@@ -10,8 +10,13 @@ describe('plugin settings', () => {
 		expect(plugin.settings).toEqual(DEFAULT_SETTINGS);
 	});
 
-	it('moves dependent tasks along and draws open-ended tasks one day long by default', () => {
-		expect(DEFAULT_SETTINGS).toMatchObject({ moveDependentTasks: true, defaultDurationDays: 1, showNotePreview: true });
+	it('leaves dependent tasks in place and draws open-ended tasks one day long by default', () => {
+		expect(DEFAULT_SETTINGS).toMatchObject({ moveDependentTasks: false, defaultDurationDays: 1, showNotePreview: true });
+	});
+
+	it('moves dependent tasks along when the setting was turned on', async () => {
+		const plugin = await loadedPlugin({ moveDependentTasks: true });
+		expect(plugin.settings.moveDependentTasks).toBe(true);
 	});
 
 	it('keeps stored values over the defaults', async () => {

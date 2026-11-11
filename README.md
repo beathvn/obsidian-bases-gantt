@@ -212,7 +212,7 @@ Optional. Only needed for [tasks you pick up again later](#resuming-a-task-later
 ## Interacting with the Chart
 
 ### Drag a bar left/right
-Reschedules the task — changes the start and end dates. The dates are written back to the note's frontmatter automatically. Tasks that depend on it move along by the same amount (this can be turned off in the plugin settings). Drags snap to whole days when the chart shows day columns, and to whole weeks when zoomed out further.
+Reschedules the task — changes the start and end dates. The dates are written back to the note's frontmatter automatically. Only that task changes, unless you turn on **Move dependent tasks along** in the plugin settings: then every task that depends on it moves by the same amount, and those notes are rewritten too. Drags snap to whole days when the chart shows day columns, and to whole weeks when zoomed out further.
 
 ### Drag the left or right edge of a bar
 Resizes the task — the right edge changes the end date, the left edge the start date. On a task without an end date, dragging the right edge sets one. A bar can't be made shorter than one day: an edge stops at the other one.
@@ -266,7 +266,7 @@ If you configure **grouping** in the view (e.g., group by `status`), the Gantt c
 
 Under **Settings → Community plugins → Gantt for Bases**:
 
-- **Move dependent tasks along** — When you drag a task, shift every task that depends on it by the same amount. Turn off to keep dependent tasks fixed in place.
+- **Move dependent tasks along** — Off by default, so dragging a task only changes that task. Turn on to shift every task that depends on it by the same amount too; those notes' dates are rewritten as well, and one Undo reverts them all.
 - **Default length without end date** — How many days a task without an end date is drawn (default 1).
 - **Properties on hover** — Note properties to show in the hover popup, separated by commas (e.g. `status, owner, priority`).
 - **Note preview on hover** — Show a preview of the note's content in the hover popup (on by default).
