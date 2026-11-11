@@ -1,10 +1,10 @@
 {
-	"id": "bases-gantt-beathvn",
-	"name": "Bases Gantt (beathvn fork)",
-	"version": "1.1.0",
-	"minAppVersion": "1.10.0",
-	"description": "Gantt chart / timeline view for Bases. Visualize tasks with start and end dates, dependencies, and progress.",
-	"author": "lhassa8",
-	"authorUrl": "https://github.com/lhassa8",
+	"id": "gantt-for-bases",
+	"name": "Gantt for Bases",
+	"version": "1.0.0",
+	"minAppVersion": "1.13.0",
+	"description": "Show notes from a base as a Gantt chart. Drag bars to reschedule, track progress and see dependencies.",
+	"author": "Lukas Ellemunt",
+	"authorUrl": "https://github.com/beathvn",
 	"isDesktopOnly": false
 }

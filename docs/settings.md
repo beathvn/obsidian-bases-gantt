@@ -15,7 +15,7 @@ A change triggers `onDataUpdated()`. Options that affect the chart's structure a
 
 ## Plugin settings (Settings → Community plugins)
 
-Defined in `settings.ts` (`BasesGanttSettings`, `BasesGanttSettingTab`) and stored in the plugin's `data.json`.
+Defined in `settings.ts` (`GanttForBasesSettings`, `GanttForBasesSettingTab`) and stored in the plugin's `data.json`. The tab is declarative (`getSettingDefinitions()`, Obsidian 1.13), so its settings appear in Obsidian's settings search. `getControlValue` / `setControlValue` convert **Properties on hover** between its stored list and the comma-separated text field, and apply changes to open views. **Value colors** is a list with add and delete controls; each row renders its color picker and value field.
 
 | Setting | Used by |
 |---|---|
@@ -29,7 +29,7 @@ Defined in `settings.ts` (`BasesGanttSettings`, `BasesGanttSettingTab`) and stor
 
 ```mermaid
 flowchart LR
-    T[Settings tab] -->|saveSettings| D[(data.json)]
+    T[Settings tab<br/>setControlValue] -->|saveSettings| D[(data.json)]
     T -->|structure changes| R["view.onDataUpdated()<br/>(every open view)"]
     T -->|move dependents| A["view.applyPluginSettings()<br/>(live Frappe option)"]
     T -.->|popup settings| H[read on next hover]

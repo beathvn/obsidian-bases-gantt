@@ -6,7 +6,7 @@ For planning: a project started long ago and paused can get a **planned start**,
 
 | Note has | Bar begins at | Dragging moves |
 |---|---|---|
-| start only | start | start (as before) |
+| start only | start | start |
 | planned start (± start) | planned start | planned start |
 
 - **Popup:** "Started <date>" when the note also has a start date.

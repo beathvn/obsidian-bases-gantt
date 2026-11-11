@@ -1,8 +1,10 @@
-# Bases Gantt
+# Gantt for Bases
 
 Turn your Obsidian notes into an interactive Gantt chart — drag to reschedule, track progress, visualize dependencies, and more.
 
-Requires **Obsidian 1.10.0+**.
+Requires **Obsidian 1.13+**.
+
+Based on [Bases Gantt](https://github.com/lhassa8/obsidian-bases-gantt) by Lars Tray. Gantt for Bases is a standalone plugin and doesn't need Bases Gantt installed.
 
 ![Gantt chart showing tasks with dependencies and color coding](screenshots/gantt-demo.png)
 
@@ -234,13 +236,13 @@ If you configure **grouping** in the view (e.g., group by `status`), the Gantt c
 
 ## Plugin Settings
 
-Under **Settings → Community plugins → Bases Gantt**:
+Under **Settings → Community plugins → Gantt for Bases**:
 
 - **Move dependent tasks along** — When you drag a task, shift every task that depends on it by the same amount. Turn off to keep dependent tasks fixed in place.
 - **Default length without end date** — How many days a task without an end date is drawn (default 1).
 - **Properties on hover** — Note properties to show in the hover popup, separated by commas (e.g. `status, owner, priority`).
 - **Note preview on hover** — Show a preview of the note's content in the hover popup (on by default).
-- **Value colors** — Give specific values of the **Color by** property a fixed color (e.g. `done` → green). Matching ignores case. Values not listed here get a color automatically, which they keep while the value is in use, so adding new values never recolors existing bars. Automatic colors skip any palette color that looks like one you fixed.
+- **Value colors** — Give specific values of the **Color by** property a fixed color (e.g. `done` → green). Matching ignores case. Values not listed here get a color automatically, which they keep while the value is in use, so adding new values never recolors existing bars. Automatic colors skip any palette color that looks like one you fixed. Up to 32 values can have a fixed color.
 
 ---
 
@@ -250,14 +252,14 @@ All commands are available via `Cmd/Ctrl + P`:
 
 | Command | What it does |
 |---------|-------------|
-| **Gantt: Scroll to today** | Jumps the chart to today's date |
-| **Gantt: Undo last change** | Reverts the most recent drag |
-| **Gantt: Create new task** | Creates a new note with today's date pre-filled |
-| **Gantt: Zoom in** / **Zoom out** | Zoom around the center of the chart |
-| **Gantt: Day view** | Jump to day-level zoom |
-| **Gantt: Week view** | Jump to week-level zoom |
-| **Gantt: Month view** | Jump to month-level zoom |
-| **Gantt: Year view** | Jump to year-level zoom |
+| **Gantt for Bases: Scroll to today** | Jumps the chart to today's date |
+| **Gantt for Bases: Undo last change** | Reverts the most recent drag |
+| **Gantt for Bases: Create new task** | Creates a new note with today's date pre-filled |
+| **Gantt for Bases: Zoom in** / **Zoom out** | Zoom around the center of the chart |
+| **Gantt for Bases: Day view** | Jump to day-level zoom |
+| **Gantt for Bases: Week view** | Jump to week-level zoom |
+| **Gantt for Bases: Month view** | Jump to month-level zoom |
+| **Gantt for Bases: Year view** | Jump to year-level zoom |
 
 ---
 
@@ -336,7 +338,7 @@ This will show:
 ## Troubleshooting
 
 ### I don't see a "Gantt" option in the view selector
-Make sure the plugin is enabled in **Settings > Community plugins**. Also make sure you're running Obsidian **1.10.0 or later**.
+Make sure the plugin is enabled in **Settings > Community plugins**. Also make sure you're running Obsidian **1.13 or later**.
 
 ### My notes don't appear on the chart
 - Make sure your notes have a **date property** in the frontmatter (e.g., `start-date: 2026-03-01`)
@@ -361,13 +363,13 @@ This can happen if date values include timezone information. Use the plain `YYYY
 ### Community Plugins (Recommended)
 
 1. Open **Settings > Community plugins > Browse**
-2. Search for **Bases Gantt**
+2. Search for **Gantt for Bases**
 3. Click **Install**, then **Enable**
 
 ### Manual
 
-1. Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/lhassa8/obsidian-bases-gantt/releases/latest)
-2. Create a folder called `bases-gantt-beathvn` inside your vault's `.obsidian/plugins/` directory
+1. Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/beathvn/obsidian-bases-gantt/releases/latest)
+2. Create a folder called `gantt-for-bases` inside your vault's `.obsidian/plugins/` directory
 3. Place the three files in that folder
 4. Enable the plugin in **Settings > Community plugins**
 
@@ -376,16 +378,23 @@ This can happen if date values include timezone information. Use the plain `YYYY
 ## Development
 
 ```bash
-git clone https://github.com/lhassa8/obsidian-bases-gantt
+git clone https://github.com/beathvn/obsidian-bases-gantt
 cd obsidian-bases-gantt
 npm install
 npm run dev    # watch mode with source maps
-npm run build  # production build
+npm run build  # type check + production build
+npm run lint   # ESLint with Obsidian's plugin rules
 ```
+
+To build straight into a test vault, set `OBSIDIAN_VAULT_PLUGIN_DIR` to its `.obsidian/plugins/gantt-for-bases` folder. Releases: `npm version patch|minor|major` updates `manifest.json` and `versions.json`; pushing the tag builds the GitHub release.
 
 How it works is documented in [docs/](docs/README.md): an architecture overview, plus one page per feature on what it does and how it is built.
 
 ---
+
+## Credits
+
+Built on [Bases Gantt](https://github.com/lhassa8/obsidian-bases-gantt) by Lars Tray, and on [Frappe Gantt](https://github.com/frappe/gantt).
 
 ## License
 

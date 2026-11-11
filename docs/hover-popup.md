@@ -29,5 +29,5 @@ stateDiagram-v2
 
 ## Switches
 
-- View option **Show details on hover** (on by default, as in the original plugin): checked on every hover, returning `false` to Frappe, so no rebuild is needed.
+- View option **Show details on hover** (on by default): checked on every hover, returning `false` to Frappe, so no rebuild is needed.
 - Plugin settings **Properties on hover** and **Note preview on hover**.

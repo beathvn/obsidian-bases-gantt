@@ -40,6 +40,12 @@ export interface TaskMapperConfig {
 export const COLOR_CLASS_COUNT = 8;
 
 /**
+ * "Value colors" entries with a class, gantt-fixed-0 … N-1, in
+ * styles/gantt-overrides.css. Later entries are ignored.
+ */
+export const MAX_FIXED_COLORS = 32;
+
+/**
  * A value's bar color: a palette slot (0 … COLOR_CLASS_COUNT-1), or the
  * index of a color fixed in the settings. Both become a CSS class.
  */

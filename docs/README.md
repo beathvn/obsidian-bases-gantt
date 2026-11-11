@@ -1,4 +1,4 @@
-# Bases Gantt docs
+# Gantt for Bases docs
 
 These docs are organized **by feature: one page per feature**. Each page briefly says what the feature does, then how it is built: which components are involved and how they work together. This page gives the overall architecture the feature pages build on.
 
@@ -17,7 +17,7 @@ These docs are organized **by feature: one page per feature**. Each page briefly
 
 ## Architecture
 
-Bases Gantt is an Obsidian Bases view. Bases runs the query and hands the view its entries (notes). The plugin turns them into tasks, draws them with [Frappe Gantt](https://github.com/frappe/gantt), and writes drags back into the notes' frontmatter.
+Gantt for Bases is an Obsidian Bases view. Bases runs the query and hands the view its entries (notes). The plugin turns them into tasks, draws them with [Frappe Gantt](https://github.com/frappe/gantt), and writes drags back into the notes' frontmatter.
 
 ```mermaid
 flowchart LR
@@ -29,7 +29,7 @@ flowchart LR
     Frappe -->|on_date_change| View
     View -->|processFrontMatter| Notes[(Note frontmatter)]
     Notes -.->|data update| Bases
-    Plugin[BasesGanttPlugin<br/>main.ts] -->|settings, colors| View
+    Plugin[GanttForBasesPlugin<br/>main.ts] -->|settings, colors| View
 ```
 
 ### Modules

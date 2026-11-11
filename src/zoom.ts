@@ -32,12 +32,8 @@ const ZOOM_BANDS: ZoomBand[] = [
 	{ mode: 'Quarter Day', daysPerColumn: 0.25, minPxPerDay: 160 }, // 40–80px
 ];
 
-/** Zoom that reproduces each former fixed view mode (also used by the "… view" commands). */
+/** Zoom presets of the "… view" commands, and the default zoom (Day). */
 export const VIEW_MODE_ZOOM: Record<string, number> = {
-	'Quarter day': 180,
-	'Quarter Day': 180,
-	'Half day': 90,
-	'Half Day': 90,
 	Day: 45,
 	Week: 20,
 	Month: 3.5,
@@ -125,7 +121,7 @@ function fittingFormat(kind: string, columnWidth: number, lang: string, widestSa
 	let index = fittingFormats.get(key);
 	if (index === undefined) {
 		const family = getComputedStyle(document.body).getPropertyValue('--font-interface').trim() || 'sans-serif';
-		measureCtx ??= document.createElement('canvas').getContext('2d');
+		measureCtx ??= createEl('canvas').getContext('2d');
 		const ctx = measureCtx;
 		if (ctx) ctx.font = `700 12px ${family}`;
 		const room = columnWidth * LABEL_SHARE - LABEL_PILL_PADDING;
@@ -199,7 +195,7 @@ interface FrappeInternals {
 	include_today?: boolean;
 	change_view_mode(mode?: string, maintain_pos?: boolean): void;
 	hide_popup(): void;
-	set_scroll_position(date: unknown): void;
+	set_scroll_position: (this: FrappeInternals, date: unknown) => void;
 	setup_gantt_dates(refresh?: boolean): void;
 	setup_date_values(): void;
 	setup_dates(refresh?: boolean): void;
@@ -657,7 +653,7 @@ export class ZoomController {
 			this.pending = { pxPerDay: this.pxPerDay, anchor: dateForX(g, g.$container.scrollLeft + x), anchorX: x };
 		}
 		this.pending.pxPerDay = clampZoom(pxPerDay);
-		if (!this.frame) this.frame = requestAnimationFrame(() => this.flush());
+		if (!this.frame) this.frame = window.requestAnimationFrame(() => this.flush());
 	}
 
 	/**
@@ -724,7 +720,7 @@ export class ZoomController {
 		const nearStart = g.windowed?.start && scrollLeft < clientWidth;
 		const nearEnd = g.windowed?.end && scrollLeft + clientWidth > scrollWidth - clientWidth;
 		if (!nearStart && !nearEnd) return;
-		this.windowFrame = requestAnimationFrame(() => {
+		this.windowFrame = window.requestAnimationFrame(() => {
 			this.windowFrame = 0;
 			if (g.bar_being_dragged != null) return;
 			this.renderAnchored(g, () => g.change_view_mode(bandFor(this.pxPerDay).mode), dateForX(g, g.$container.scrollLeft), 0);
@@ -734,8 +730,8 @@ export class ZoomController {
 
 	destroy(): void {
 		window.clearTimeout(this.gestureTimer);
-		cancelAnimationFrame(this.windowFrame);
-		cancelAnimationFrame(this.frame);
+		window.cancelAnimationFrame(this.windowFrame);
+		window.cancelAnimationFrame(this.frame);
 		window.clearTimeout(this.settleTimer);
 		this.endPinch();
 		this.frame = 0;

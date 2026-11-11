@@ -1,16 +1,16 @@
 import { Plugin, debounce } from 'obsidian';
 import { GanttChartView, getGanttViewOptions } from './gantt-view';
-import { COLOR_CLASS_COUNT } from './task-mapper';
-import { BasesGanttSettings, BasesGanttSettingTab, DEFAULT_SETTINGS } from './settings';
+import { COLOR_CLASS_COUNT, MAX_FIXED_COLORS } from './task-mapper';
+import { GanttForBasesSettings, GanttForBasesSettingTab, DEFAULT_SETTINGS } from './settings';
 
-export default class BasesGanttPlugin extends Plugin {
-	settings: BasesGanttSettings = DEFAULT_SETTINGS;
+export default class GanttForBasesPlugin extends Plugin {
+	settings: GanttForBasesSettings = DEFAULT_SETTINGS;
 
 	async onload() {
 		await this.loadSettings();
-		this.addSettingTab(new BasesGanttSettingTab(this.app, this));
+		this.addSettingTab(new GanttForBasesSettingTab(this.app, this));
 
-		this.registerBasesView('gantt', {
+		this.registerBasesView('gantt-for-bases', {
 			name: 'Gantt',
 			icon: 'calendar-range',
 			factory: (controller, containerEl) => {
@@ -118,7 +118,7 @@ export default class BasesGanttPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		const loaded = (await this.loadData()) as Partial<BasesGanttSettings> | null;
+		const loaded = (await this.loadData()) as Partial<GanttForBasesSettings> | null;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
 		// Copied so assigning colors never mutates DEFAULT_SETTINGS.
 		this.settings.colorAssignments = { ...loaded?.colorAssignments };
@@ -174,7 +174,8 @@ export default class BasesGanttPlugin extends Plugin {
 	fixedColorIndex(value: string): number {
 		const wanted = value.trim().toLowerCase();
 		if (!wanted) return -1;
-		return this.settings.valueColors.findIndex((v) => v.value.trim().toLowerCase() === wanted);
+		const index = this.settings.valueColors.findIndex((v) => v.value.trim().toLowerCase() === wanted);
+		return index < MAX_FIXED_COLORS ? index : -1;
 	}
 
 	onunload() {

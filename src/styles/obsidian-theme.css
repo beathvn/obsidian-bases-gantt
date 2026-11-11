@@ -2,7 +2,7 @@
  * Bridge Frappe Gantt CSS variables to Obsidian's theme variables.
  * Dark/light mode is handled automatically via Obsidian's CSS variable cascade.
  */
-.bases-gantt-view {
+.gantt-for-bases-view {
 	--g-arrow-color: var(--text-muted);
 	--g-bar-color: var(--interactive-accent);
 	--g-bar-border: var(--interactive-accent);

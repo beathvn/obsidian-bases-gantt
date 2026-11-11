@@ -15,7 +15,7 @@ const MIN_SATURATION = 0.15;
 
 /** Hue (degrees) and saturation (0–1) of any CSS color, resolved against the current theme. */
 function hueOf(probe: HTMLElement, cssColor: string): { hue: number; saturation: number } | null {
-	probe.style.color = '';
+	probe.style.removeProperty('color');
 	probe.style.color = cssColor;
 	if (!probe.style.color) return null;
 	const match = getComputedStyle(probe).color.match(/[\d.]+/g);
@@ -42,8 +42,7 @@ function hueOf(probe: HTMLElement, cssColor: string): { hue: number; saturation:
 export function slotsResembling(colors: string[]): Set<number> {
 	const blocked = new Set<number>();
 	if (colors.length === 0) return blocked;
-	const probe = document.body.createDiv();
-	probe.style.display = 'none';
+	const probe = document.body.createDiv({ cls: 'gantt-for-bases-probe' });
 	try {
 		const fixed = colors
 			.map((c) => hueOf(probe, c))

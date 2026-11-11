@@ -3,14 +3,14 @@
  */
 
 /* Container — fill available space */
-.bases-gantt-view {
+.gantt-for-bases-view {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
 	min-height: 0;
 }
 
-.bases-gantt-view .gantt-wrapper {
+.gantt-for-bases-view .gantt-wrapper {
 	border-radius: var(--radius-m);
 	border: 1px solid var(--background-modifier-border);
 	overflow: auto;
@@ -22,79 +22,79 @@
 	overflow-anchor: none;
 }
 
-.bases-gantt-view .gantt-container {
+.gantt-for-bases-view .gantt-container {
 	font-family: var(--font-interface);
 	border-radius: var(--radius-m);
 	overflow-anchor: none;
 }
 
 /* Bar labels */
-.bases-gantt-view .gantt .bar-label {
+.gantt-for-bases-view .gantt .bar-label {
 	font-family: var(--font-interface);
 	font-size: 12px;
 	font-weight: 500;
 }
 
 /* Sticky header */
-.bases-gantt-view .gantt-container .current-upper {
+.gantt-for-bases-view .gantt-container .current-upper {
 	background: var(--background-primary);
 }
 
-.bases-gantt-view .gantt-container .side-header * {
+.gantt-for-bases-view .gantt-container .side-header * {
 	background-color: var(--background-secondary);
 	color: var(--text-normal);
 	font-family: var(--font-interface);
 }
 
-.bases-gantt-view .gantt-container .side-header *:hover {
+.gantt-for-bases-view .gantt-container .side-header *:hover {
 	background-color: var(--background-modifier-hover);
 }
 
 /* Today button */
-.bases-gantt-view .gantt-container .today-button {
+.gantt-for-bases-view .gantt-container .today-button {
 	cursor: pointer;
 }
 
 /* Smooth color transitions on bars */
-.bases-gantt-view .gantt .bar {
+.gantt-for-bases-view .gantt .bar {
 	transition: fill 0.2s ease, stroke 0.2s ease, opacity 0.2s ease;
 }
 
 /* No width transition: dragging the progress handle sets the width on every
    mousemove, and restarting a transition each time made the fill trail the pointer. */
-.bases-gantt-view .gantt .bar-progress {
+.gantt-for-bases-view .gantt .bar-progress {
 	transition: fill 0.2s ease;
 }
 
-.bases-gantt-view .gantt .bar-wrapper {
+.gantt-for-bases-view .gantt .bar-wrapper {
 	cursor: pointer;
 }
 
 /* Handle cursor */
-.bases-gantt-view .gantt .handle {
+.gantt-for-bases-view .gantt .handle {
 	cursor: ew-resize;
 }
 
 /* ── Today line enhancement ──────────────────────────────────────── */
 
-.bases-gantt-view .gantt .current-highlight {
+.gantt-for-bases-view .gantt .current-highlight {
 	opacity: 0.12;
 }
 
-.bases-gantt-view .gantt .current-date-highlight {
+.gantt-for-bases-view .gantt .current-date-highlight {
 	font-weight: 700;
 }
 
 /* The today line is an HTML div layered above the chart's SVG, so without
    this it swallows mousedown/mousemove on any bar that crosses today. */
-.bases-gantt-view .gantt-container .current-highlight,
-.bases-gantt-view .gantt-container .current-ball-highlight {
+.gantt-for-bases-view .gantt-container .current-highlight,
+.gantt-for-bases-view .gantt-container .current-ball-highlight {
 	pointer-events: none;
 }
 
 /* ── Expected progress line ──────────────────────────────────────── */
 
-.bases-gantt-view .gantt .bar-expected-progress {
+.gantt-for-bases-view .gantt .bar-expected-progress {
 	opacity: 0.35;
 	stroke-dasharray: 4 2;
 }
@@ -104,12 +104,12 @@
 /* One transparent rect over the grid takes the clicks that create a task;
    the day under the pointer is highlighted by a single moving rect. */
 /* :hover too, over Frappe's own .grid-column:hover fill. */
-.bases-gantt-view .gantt .gantt-click-target,
-.bases-gantt-view .gantt .gantt-click-target:hover {
+.gantt-for-bases-view .gantt .gantt-click-target,
+.gantt-for-bases-view .gantt .gantt-click-target:hover {
 	fill: transparent;
 }
 
-.bases-gantt-view .gantt .gantt-day-hover {
+.gantt-for-bases-view .gantt .gantt-day-hover {
 	fill: var(--background-modifier-hover);
 	opacity: 0.25;
 	pointer-events: none;
@@ -119,83 +119,245 @@
 
 /* Bars read their shades from --gantt-fill / -progress / -hover. Palette
    slots and fixed value colors get theirs resolved by script (colors.ts:
-   barShades), as plain colors: the view sets --gantt-palette-N-* on its
-   container, and fixed colors are set inline on the bar. Bars without a
+   barShades), as plain colors: the view sets --gantt-palette-N-* and
+   --gantt-fixed-N-* on its container. Bars without a
    "Color by" value use the theme's accent as is (Obsidian's purple by
    default); every palette hue differs from it. */
-.bases-gantt-view .gantt .bar-wrapper {
+.gantt-for-bases-view .gantt .bar-wrapper {
 	--gantt-fill: var(--interactive-accent);
 	--gantt-hover: var(--interactive-accent-hover);
 	--gantt-progress: color-mix(in oklch, var(--interactive-accent), black 20%);
 }
 
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-0 {
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-color-0 {
 	--gantt-fill: var(--gantt-palette-0-fill);
 	--gantt-hover: var(--gantt-palette-0-hover);
 	--gantt-progress: var(--gantt-palette-0-progress);
 }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-1 {
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-color-1 {
 	--gantt-fill: var(--gantt-palette-1-fill);
 	--gantt-hover: var(--gantt-palette-1-hover);
 	--gantt-progress: var(--gantt-palette-1-progress);
 }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-2 {
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-color-2 {
 	--gantt-fill: var(--gantt-palette-2-fill);
 	--gantt-hover: var(--gantt-palette-2-hover);
 	--gantt-progress: var(--gantt-palette-2-progress);
 }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-3 {
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-color-3 {
 	--gantt-fill: var(--gantt-palette-3-fill);
 	--gantt-hover: var(--gantt-palette-3-hover);
 	--gantt-progress: var(--gantt-palette-3-progress);
 }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-4 {
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-color-4 {
 	--gantt-fill: var(--gantt-palette-4-fill);
 	--gantt-hover: var(--gantt-palette-4-hover);
 	--gantt-progress: var(--gantt-palette-4-progress);
 }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-5 {
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-color-5 {
 	--gantt-fill: var(--gantt-palette-5-fill);
 	--gantt-hover: var(--gantt-palette-5-hover);
 	--gantt-progress: var(--gantt-palette-5-progress);
 }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-6 {
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-color-6 {
 	--gantt-fill: var(--gantt-palette-6-fill);
 	--gantt-hover: var(--gantt-palette-6-hover);
 	--gantt-progress: var(--gantt-palette-6-progress);
 }
-.bases-gantt-view .gantt .bar-wrapper.gantt-color-7 {
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-color-7 {
 	--gantt-fill: var(--gantt-palette-7-fill);
 	--gantt-hover: var(--gantt-palette-7-hover);
 	--gantt-progress: var(--gantt-palette-7-progress);
 }
 
-.bases-gantt-view .gantt .bar-wrapper .bar {
+/* "Value colors" entries, shades resolved per view (MAX_FIXED_COLORS in task-mapper.ts). */
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-0 {
+	--gantt-fill: var(--gantt-fixed-0-fill);
+	--gantt-hover: var(--gantt-fixed-0-hover);
+	--gantt-progress: var(--gantt-fixed-0-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-1 {
+	--gantt-fill: var(--gantt-fixed-1-fill);
+	--gantt-hover: var(--gantt-fixed-1-hover);
+	--gantt-progress: var(--gantt-fixed-1-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-2 {
+	--gantt-fill: var(--gantt-fixed-2-fill);
+	--gantt-hover: var(--gantt-fixed-2-hover);
+	--gantt-progress: var(--gantt-fixed-2-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-3 {
+	--gantt-fill: var(--gantt-fixed-3-fill);
+	--gantt-hover: var(--gantt-fixed-3-hover);
+	--gantt-progress: var(--gantt-fixed-3-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-4 {
+	--gantt-fill: var(--gantt-fixed-4-fill);
+	--gantt-hover: var(--gantt-fixed-4-hover);
+	--gantt-progress: var(--gantt-fixed-4-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-5 {
+	--gantt-fill: var(--gantt-fixed-5-fill);
+	--gantt-hover: var(--gantt-fixed-5-hover);
+	--gantt-progress: var(--gantt-fixed-5-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-6 {
+	--gantt-fill: var(--gantt-fixed-6-fill);
+	--gantt-hover: var(--gantt-fixed-6-hover);
+	--gantt-progress: var(--gantt-fixed-6-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-7 {
+	--gantt-fill: var(--gantt-fixed-7-fill);
+	--gantt-hover: var(--gantt-fixed-7-hover);
+	--gantt-progress: var(--gantt-fixed-7-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-8 {
+	--gantt-fill: var(--gantt-fixed-8-fill);
+	--gantt-hover: var(--gantt-fixed-8-hover);
+	--gantt-progress: var(--gantt-fixed-8-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-9 {
+	--gantt-fill: var(--gantt-fixed-9-fill);
+	--gantt-hover: var(--gantt-fixed-9-hover);
+	--gantt-progress: var(--gantt-fixed-9-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-10 {
+	--gantt-fill: var(--gantt-fixed-10-fill);
+	--gantt-hover: var(--gantt-fixed-10-hover);
+	--gantt-progress: var(--gantt-fixed-10-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-11 {
+	--gantt-fill: var(--gantt-fixed-11-fill);
+	--gantt-hover: var(--gantt-fixed-11-hover);
+	--gantt-progress: var(--gantt-fixed-11-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-12 {
+	--gantt-fill: var(--gantt-fixed-12-fill);
+	--gantt-hover: var(--gantt-fixed-12-hover);
+	--gantt-progress: var(--gantt-fixed-12-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-13 {
+	--gantt-fill: var(--gantt-fixed-13-fill);
+	--gantt-hover: var(--gantt-fixed-13-hover);
+	--gantt-progress: var(--gantt-fixed-13-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-14 {
+	--gantt-fill: var(--gantt-fixed-14-fill);
+	--gantt-hover: var(--gantt-fixed-14-hover);
+	--gantt-progress: var(--gantt-fixed-14-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-15 {
+	--gantt-fill: var(--gantt-fixed-15-fill);
+	--gantt-hover: var(--gantt-fixed-15-hover);
+	--gantt-progress: var(--gantt-fixed-15-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-16 {
+	--gantt-fill: var(--gantt-fixed-16-fill);
+	--gantt-hover: var(--gantt-fixed-16-hover);
+	--gantt-progress: var(--gantt-fixed-16-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-17 {
+	--gantt-fill: var(--gantt-fixed-17-fill);
+	--gantt-hover: var(--gantt-fixed-17-hover);
+	--gantt-progress: var(--gantt-fixed-17-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-18 {
+	--gantt-fill: var(--gantt-fixed-18-fill);
+	--gantt-hover: var(--gantt-fixed-18-hover);
+	--gantt-progress: var(--gantt-fixed-18-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-19 {
+	--gantt-fill: var(--gantt-fixed-19-fill);
+	--gantt-hover: var(--gantt-fixed-19-hover);
+	--gantt-progress: var(--gantt-fixed-19-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-20 {
+	--gantt-fill: var(--gantt-fixed-20-fill);
+	--gantt-hover: var(--gantt-fixed-20-hover);
+	--gantt-progress: var(--gantt-fixed-20-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-21 {
+	--gantt-fill: var(--gantt-fixed-21-fill);
+	--gantt-hover: var(--gantt-fixed-21-hover);
+	--gantt-progress: var(--gantt-fixed-21-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-22 {
+	--gantt-fill: var(--gantt-fixed-22-fill);
+	--gantt-hover: var(--gantt-fixed-22-hover);
+	--gantt-progress: var(--gantt-fixed-22-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-23 {
+	--gantt-fill: var(--gantt-fixed-23-fill);
+	--gantt-hover: var(--gantt-fixed-23-hover);
+	--gantt-progress: var(--gantt-fixed-23-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-24 {
+	--gantt-fill: var(--gantt-fixed-24-fill);
+	--gantt-hover: var(--gantt-fixed-24-hover);
+	--gantt-progress: var(--gantt-fixed-24-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-25 {
+	--gantt-fill: var(--gantt-fixed-25-fill);
+	--gantt-hover: var(--gantt-fixed-25-hover);
+	--gantt-progress: var(--gantt-fixed-25-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-26 {
+	--gantt-fill: var(--gantt-fixed-26-fill);
+	--gantt-hover: var(--gantt-fixed-26-hover);
+	--gantt-progress: var(--gantt-fixed-26-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-27 {
+	--gantt-fill: var(--gantt-fixed-27-fill);
+	--gantt-hover: var(--gantt-fixed-27-hover);
+	--gantt-progress: var(--gantt-fixed-27-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-28 {
+	--gantt-fill: var(--gantt-fixed-28-fill);
+	--gantt-hover: var(--gantt-fixed-28-hover);
+	--gantt-progress: var(--gantt-fixed-28-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-29 {
+	--gantt-fill: var(--gantt-fixed-29-fill);
+	--gantt-hover: var(--gantt-fixed-29-hover);
+	--gantt-progress: var(--gantt-fixed-29-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-30 {
+	--gantt-fill: var(--gantt-fixed-30-fill);
+	--gantt-hover: var(--gantt-fixed-30-hover);
+	--gantt-progress: var(--gantt-fixed-30-progress);
+}
+.gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-31 {
+	--gantt-fill: var(--gantt-fixed-31-fill);
+	--gantt-hover: var(--gantt-fixed-31-hover);
+	--gantt-progress: var(--gantt-fixed-31-progress);
+}
+
+.gantt-for-bases-view .gantt .bar-wrapper .bar {
 	fill: var(--gantt-fill);
 	stroke: none;
 	outline: none;
 }
 
-.bases-gantt-view .gantt .bar-wrapper .bar-progress {
+.gantt-for-bases-view .gantt .bar-wrapper .bar-progress {
 	fill: var(--gantt-progress);
 }
 
-.bases-gantt-view .gantt .bar-wrapper:not(.gantt-group-header) .bar-label:not(.big) {
+.gantt-for-bases-view .gantt .bar-wrapper:not(.gantt-group-header) .bar-label:not(.big) {
 	fill: white;
 	font-weight: 600;
 }
 
 /* Labels that don't fit are drawn beside the bar, on the chart background. */
-.bases-gantt-view .gantt .bar-wrapper:not(.gantt-group-header) .bar-label.big {
+.gantt-for-bases-view .gantt .bar-wrapper:not(.gantt-group-header) .bar-label.big {
 	fill: var(--text-normal);
 }
 
-.bases-gantt-view .gantt .bar-wrapper:not(.gantt-group-header):hover .bar {
+.gantt-for-bases-view .gantt .bar-wrapper:not(.gantt-group-header):hover .bar {
 	fill: var(--gantt-hover);
 }
 
 /* From a note's own start to its bar when the bar begins at the planned start. */
-.bases-gantt-view .gantt .bar-wrapper .gantt-original-start {
+.gantt-for-bases-view .gantt .bar-wrapper .gantt-original-start {
 	stroke: var(--gantt-fill);
 	stroke-width: 2;
 	stroke-dasharray: 2 4;
@@ -206,7 +368,7 @@
 
 /* ── Group header rows ───────────────────────────────────────────── */
 
-.bases-gantt-view .gantt .gantt-group-header .bar {
+.gantt-for-bases-view .gantt .gantt-group-header .bar {
 	fill: var(--background-secondary);
 	stroke: var(--background-modifier-border);
 	stroke-width: 1;
@@ -215,7 +377,7 @@
 	ry: 4;
 }
 
-.bases-gantt-view .gantt .gantt-group-header .bar-label {
+.gantt-for-bases-view .gantt .gantt-group-header .bar-label {
 	fill: var(--text-muted);
 	font-weight: 700;
 	font-size: 11px;
@@ -223,17 +385,17 @@
 	letter-spacing: 0.05em;
 }
 
-.bases-gantt-view .gantt .gantt-group-header .bar-progress {
+.gantt-for-bases-view .gantt .gantt-group-header .bar-progress {
 	display: none;
 }
 
-.bases-gantt-view .gantt .gantt-group-header .handle {
+.gantt-for-bases-view .gantt .gantt-group-header .handle {
 	display: none;
 }
 
 /* ── Milestone rendering ─────────────────────────────────────────── */
 
-.bases-gantt-view .gantt .gantt-milestone .bar {
+.gantt-for-bases-view .gantt .gantt-milestone .bar {
 	rx: 2;
 	ry: 2;
 	opacity: 0.9;
@@ -241,7 +403,7 @@
 
 /* ── Rich hover popup ────────────────────────────────────────────── */
 
-.bases-gantt-view .popup-wrapper {
+.gantt-for-bases-view .popup-wrapper {
 	/* Above the sticky date header (z-index 1000), which would cover its top. */
 	z-index: 1010;
 	font-family: var(--font-interface);
@@ -252,13 +414,13 @@
 	background: var(--background-primary);
 }
 
-.bases-gantt-view .popup-wrapper .title {
+.gantt-for-bases-view .popup-wrapper .title {
 	font-weight: 600;
 	font-size: 14px;
 	color: var(--text-normal);
 }
 
-.bases-gantt-view .popup-wrapper .subtitle {
+.gantt-for-bases-view .popup-wrapper .subtitle {
 	font-size: 12px;
 	color: var(--text-muted);
 	margin-top: 2px;
@@ -266,7 +428,7 @@
 
 /* The hovered bar's date range in the header: a light tint, so the
    month/day labels on top of it stay readable. */
-.bases-gantt-view .gantt-container .date-range-highlight {
+.gantt-for-bases-view .gantt-container .date-range-highlight {
 	background-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
@@ -352,7 +514,7 @@
 }
 
 /* Read-only: clicks open the note (see the popup click handler). */
-.bases-gantt-view .popup-wrapper {
+.gantt-for-bases-view .popup-wrapper {
 	cursor: pointer;
 }
 
@@ -414,20 +576,25 @@
 
 /* ── Quarter backdrop (Month zoom) ───────────────────────────────── */
 
-.bases-gantt-view .gantt .gantt-quarters {
+.gantt-for-bases-view .gantt .gantt-quarters {
 	pointer-events: none;
 }
 
-.bases-gantt-view .gantt .gantt-quarter-band {
+.gantt-for-bases-view .gantt .gantt-quarter-band {
 	fill: var(--text-normal);
 	opacity: 0.025;
 }
 
-.bases-gantt-view .gantt .gantt-quarter-label {
+.gantt-for-bases-view .gantt .gantt-quarter-label {
 	fill: var(--text-faint);
 	opacity: 0.25;
 	font-weight: 700;
 	letter-spacing: 0.02em;
 	text-anchor: middle;
 	dominant-baseline: middle;
+}
+
+/* Hidden element for resolving theme colors (colors.ts). */
+.gantt-for-bases-probe {
+	display: none;
 }

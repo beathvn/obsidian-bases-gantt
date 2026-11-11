@@ -1,16 +1,16 @@
 /* ── Settings tab: value colors ── */
 
-/* One line per value: color, value (filling the row), remove. */
-.bases-gantt-value-color .setting-item-info {
+/* One line per value: color, then the value filling the row. */
+.gantt-for-bases-value-colors .setting-item-info {
 	display: none;
 }
 
-.bases-gantt-value-color .setting-item-control {
+.gantt-for-bases-value-colors .setting-item-control {
 	flex: 1;
 	justify-content: flex-start;
 }
 
-.bases-gantt-value-color .setting-item-control input[type='text'] {
+.gantt-for-bases-value-colors .setting-item-control input[type='text'] {
 	flex: 1;
 	min-width: 0;
 }

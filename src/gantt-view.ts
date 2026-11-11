@@ -13,10 +13,10 @@ import {
 } from 'obsidian';
 import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
-import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, GROUP_HEADER_PREFIX, type BarColor, type GanttTask, type TaskMapperConfig } from './task-mapper';
+import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, GROUP_HEADER_PREFIX, MAX_FIXED_COLORS, type BarColor, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
 import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll, withRenderCenter, clearLabelFormats } from './zoom';
-import type BasesGanttPlugin from './main';
+import type GanttForBasesPlugin from './main';
 import { PALETTE_VARS, barShades, setBarShades, slotsResembling, type BarShades } from './colors';
 
 // ── Drag moves the whole dependency chain ──
@@ -240,7 +240,7 @@ interface ScrollState {
 	zoom?: number;
 }
 
-const SCROLL_STATE_KEY = 'bases-gantt-scroll';
+const SCROLL_STATE_KEY = 'gantt-for-bases-scroll';
 const MAX_SCROLL_STATES = 100;
 
 /** Only note (frontmatter) properties can be written; file.* and formula.* are computed. */
@@ -248,7 +248,7 @@ const MAX_SCROLL_STATES = 100;
 function formatPropertyValue(value: unknown): string {
 	if (value == null) return '';
 	if (Array.isArray(value)) return value.map(formatPropertyValue).filter(Boolean).join(', ');
-	if (typeof value === 'object') return JSON.stringify(value);
+	if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') return JSON.stringify(value) ?? '';
 	return String(value).replace(/\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g, (_, target: string, alias?: string) => alias ?? target);
 }
 
@@ -277,7 +277,7 @@ function recordsEqual(a: Record<string, string | number>, b: Record<string, stri
 }
 
 export class GanttChartView extends BasesView {
-	type = 'gantt';
+	type = 'gantt-for-bases';
 
 	/** Static registry of active instances for command palette integration. */
 	static instances: Set<GanttChartView> = new Set();
@@ -329,18 +329,17 @@ export class GanttChartView extends BasesView {
 	/** Longest note body rendered in the hover popup's scrollable preview. */
 	private static readonly PREVIEW_MAX_CHARS = 5000;
 	private readonly shadeCache = new Map<string, BarShades>();
-	private fixedColorStyle: HTMLStyleElement | null = null;
 	/** Task the hover popup was last filled for, so a late preview of another note is dropped. */
 	private popupTaskId: string | null = null;
 
-	constructor(controller: QueryController, containerEl: HTMLElement, private plugin: BasesGanttPlugin) {
+	constructor(controller: QueryController, containerEl: HTMLElement, private plugin: GanttForBasesPlugin) {
 		super(controller);
 		this.containerEl = containerEl;
 	}
 
 	onload(): void {
 		GanttChartView.instances.add(this);
-		this.containerEl.addClass('bases-gantt-view');
+		this.containerEl.addClass('gantt-for-bases-view');
 		this.ganttEl = this.containerEl.createDiv({ cls: 'gantt-wrapper' });
 		this.resolvePalette();
 		// The palette follows the theme's --color-* values.
@@ -352,7 +351,7 @@ export class GanttChartView extends BasesView {
 		}));
 		this.registerContextMenu();
 		this.zoom = new ZoomController(
-			this.getStoredZoom(),
+			VIEW_MODE_ZOOM.Day,
 			() => this.gantt,
 			() => this.afterRender(),
 			() => this.recordScroll(),
@@ -440,8 +439,7 @@ export class GanttChartView extends BasesView {
 	/**
 	 * The frontmatter key progress is written to, or null while it's read-only:
 	 * "Drag to set progress" turned off, progress hidden, or computed (a
-	 * formula, e.g. from task counts, can't be written). On unless turned off,
-	 * as in the original plugin.
+	 * formula, e.g. from task counts, can't be written). On unless turned off.
 	 */
 	private editableProgressProperty(): string | null {
 		const config = this.getTaskMapperConfig();
@@ -549,13 +547,10 @@ export class GanttChartView extends BasesView {
 
 	/** Show a Notice with an inline "Undo" action for a just-applied drag change. */
 	private showUndoNotice(description: string): void {
-		const notice = new Notice('', 6000);
-		notice.noticeEl.empty();
-		notice.noticeEl.createSpan({ text: description });
-		const undoBtn = notice.noticeEl.createEl('button', {
-			text: 'Undo',
-			cls: 'gantt-undo-notice-btn',
-		});
+		const message = createFragment();
+		message.createSpan({ text: description });
+		const undoBtn = message.createEl('button', { text: 'Undo', cls: 'gantt-undo-notice-btn' });
+		const notice = new Notice(message, 6000);
 		undoBtn.addEventListener('click', (evt) => {
 			evt.stopPropagation();
 			notice.hide();
@@ -563,7 +558,7 @@ export class GanttChartView extends BasesView {
 		});
 	}
 
-	/** Public: jump to the zoom level of a former fixed view mode (for command palette). */
+	/** Public: jump to the zoom preset of Day, Week, Month or Year view (for command palette). */
 	setViewMode(mode: string): void {
 		const pxPerDay = VIEW_MODE_ZOOM[mode];
 		if (pxPerDay) this.zoom.zoomTo(pxPerDay);
@@ -578,13 +573,6 @@ export class GanttChartView extends BasesView {
 		this.zoom.zoomBy(1 / 1.5);
 	}
 
-	/** Default zoom (pixels per day) from the view config, falling back to the former "View mode" option. */
-	private getStoredZoom(): number {
-		const zoom = this.config?.get('zoom');
-		if (typeof zoom === 'number' && zoom > 0) return zoom;
-		return VIEW_MODE_ZOOM[this.config?.get('viewMode') as string] ?? VIEW_MODE_ZOOM.Day;
-	}
-
 	/** Color slots for the values of the color-by property this view currently shows. */
 	private syncColors(property: BasesPropertyId | null): Record<string, number> {
 		if (!property) return {};
@@ -597,7 +585,7 @@ export class GanttChartView extends BasesView {
 		const viewKey = this.getViewKey();
 		// Without a view key (not yet in a leaf) colors are only read and
 		// assigned, never freed, so another view's values are left alone.
-		const fixedColors = this.plugin.settings.valueColors.filter((v) => v.value.trim()).map((v) => v.color);
+		const fixedColors = this.plugin.settings.valueColors.slice(0, MAX_FIXED_COLORS).filter((v) => v.value.trim()).map((v) => v.color);
 		return this.plugin.syncColors(
 			viewKey ? `${viewKey}::${property}` : property, values, viewKey != null, slotsResembling(fixedColors),
 		);
@@ -670,7 +658,7 @@ export class GanttChartView extends BasesView {
 		}
 		const today = formatDateForFrontmatter(new Date());
 		const propName = this.extractPropertyName(config.startProperty);
-		void this.createFileForView('New task', (frontmatter) => {
+		void this.createFileForView('New task', (frontmatter: Record<string, unknown>) => {
 			if (isNoteProperty(config.startProperty!)) frontmatter[propName] = today;
 			if (config.endProperty && isNoteProperty(config.endProperty)) {
 				const endPropName = this.extractPropertyName(config.endProperty);
@@ -900,13 +888,13 @@ export class GanttChartView extends BasesView {
 		}
 		this.ganttEl.empty();
 
-		// The view config isn't available yet in onload, so apply the saved
-		// zoom here, before the first chart is built.
+		// The view's key (its base and name) isn't known yet in onload, so
+		// apply the saved zoom here, before the first chart is built.
 		const savedScroll = this.getSavedScrollState();
 		if (!this.zoomRestored) {
 			this.zoomRestored = true;
 			const zoom = savedScroll?.zoom;
-			this.zoom.zoomTo(typeof zoom === 'number' && zoom > 0 ? zoom : this.getStoredZoom());
+			this.zoom.zoomTo(typeof zoom === 'number' && zoom > 0 ? zoom : VIEW_MODE_ZOOM.Day);
 		}
 
 		const barHeight = (this.config.get('barHeight') as number) || 30;
@@ -1031,7 +1019,7 @@ export class GanttChartView extends BasesView {
 			patchDragSnap(this.gantt);
 			patchPopup(this.gantt, () => this.fitPopup(), () => this.mouseDownPos !== null);
 		} catch (e) {
-			console.error('Bases Gantt: failed to initialize chart', e);
+			console.error('Gantt for Bases: failed to initialize chart', e);
 			this.ganttEl.empty();
 			this.renderEmptyState(this.getTaskMapperConfig());
 			return;
@@ -1164,20 +1152,16 @@ export class GanttChartView extends BasesView {
 	}
 
 	/**
-	 * CSS rules giving each "Value colors" entry a class, gantt-fixed-N, like
-	 * the palette's gantt-color-N. A class comes with the bar when Frappe
-	 * creates it; shades set inline on bars afterwards were lost on iOS while
-	 * pinch-zooming re-rendered the chart.
+	 * Resolve each "Value colors" entry's shades into --gantt-fixed-N-* on the
+	 * view, which the gantt-fixed-N classes read, like the palette's
+	 * gantt-color-N. A class comes with the bar when Frappe creates it; shades
+	 * set inline on bars afterwards were lost on iOS while pinch-zooming
+	 * re-rendered the chart.
 	 */
 	private updateFixedColorStyles(): void {
-		const rules = this.plugin.settings.valueColors.map(({ color }, index) => {
-			if (!color) return '';
-			const { fill, progress, hover } = this.shadesFor(color);
-			return `.bases-gantt-view .gantt .bar-wrapper.gantt-fixed-${index} `
-				+ `{ --gantt-fill: ${fill}; --gantt-progress: ${progress}; --gantt-hover: ${hover}; }`;
-		}).join('\n');
-		if (!this.fixedColorStyle?.isConnected) this.fixedColorStyle = this.containerEl.createEl('style');
-		if (this.fixedColorStyle.textContent !== rules) this.fixedColorStyle.textContent = rules;
+		this.plugin.settings.valueColors.slice(0, MAX_FIXED_COLORS).forEach(({ color }, index) => {
+			if (color) setBarShades(this.containerEl, this.shadesFor(color), `--gantt-fixed-${index}`);
+		});
 	}
 
 	/** Bar shades of a color, computed once per color (and theme). */
@@ -1185,8 +1169,7 @@ export class GanttChartView extends BasesView {
 		let shades = this.shadeCache.get(cssColor);
 		if (!shades) {
 			// Inside the view, so theme variables resolve as they do for the bars.
-			const probe = this.containerEl.createDiv();
-			probe.style.display = 'none';
+			const probe = this.containerEl.createDiv({ cls: 'gantt-for-bases-probe' });
 			shades = barShades(probe, cssColor);
 			probe.remove();
 			this.shadeCache.set(cssColor, shades);
@@ -1205,8 +1188,7 @@ export class GanttChartView extends BasesView {
 		const x = Math.max(0, xForDate(gantt, start));
 		if (!(x < barX)) return;
 		const y = Number(bar.getAttribute('y')) + Number(bar.getAttribute('height')) / 2;
-		const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-		line.setAttribute('class', 'gantt-original-start');
+		const line = createSvg('line', { cls: 'gantt-original-start' });
 		line.setAttribute('x1', String(x));
 		line.setAttribute('x2', String(barX));
 		line.setAttribute('y1', String(y));
@@ -1259,13 +1241,11 @@ export class GanttChartView extends BasesView {
 			preview = body.substring(0, cut > 0 ? cut : GanttChartView.PREVIEW_MAX_CHARS) + '\n\n…';
 		}
 
-		const popupEl = this.ganttEl.querySelector('.popup-wrapper');
+		const popupEl = this.ganttEl.querySelector<HTMLElement>('.popup-wrapper');
 		if (!popupEl) return;
 		popupEl.querySelector('.gantt-popup-preview')?.remove();
 
-		const previewDiv = document.createElement('div');
-		previewDiv.className = 'gantt-popup-preview';
-		popupEl.appendChild(previewDiv);
+		const previewDiv = popupEl.createDiv({ cls: 'gantt-popup-preview' });
 
 		await MarkdownRenderer.render(this.app, preview, previewDiv, ganttTask.filePath, this);
 		if (this.popupTaskId !== ganttTask.id) {
@@ -1391,7 +1371,7 @@ export class GanttChartView extends BasesView {
 		const formattedDate = parsed ? formatDateForFrontmatter(parsed) : dateStr;
 
 		const propName = this.extractPropertyName(config.startProperty);
-		void this.createFileForView('New task', (frontmatter) => {
+		void this.createFileForView('New task', (frontmatter: Record<string, unknown>) => {
 			if (isNoteProperty(config.startProperty!)) frontmatter[propName] = formattedDate;
 			if (config.endProperty && isNoteProperty(config.endProperty)) {
 				const endPropName = this.extractPropertyName(config.endProperty);
@@ -1442,7 +1422,7 @@ export class GanttChartView extends BasesView {
 		const file = this.app.vault.getFileByPath(filePath);
 		if (!file) return;
 
-		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+		await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 			for (const [key, value] of Object.entries(updates)) {
 				frontmatter[key] = value;
 			}
