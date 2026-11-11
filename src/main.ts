@@ -44,17 +44,6 @@ export default class GanttForBasesPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: 'gantt-create-task',
-			name: 'Create new task',
-			icon: 'plus',
-			checkCallback: (checking) => {
-				const view = this.getActiveGanttView();
-				if (checking) return !!view;
-				view?.createTaskAtToday();
-			},
-		});
-
-		this.addCommand({
 			id: 'gantt-zoom-in',
 			name: 'Zoom in',
 			icon: 'zoom-in',

@@ -8,7 +8,6 @@ Registered in `main.ts`. Each one acts on the Gantt view in the active leaf, or 
 |---|---|
 | Scroll to today | `scrollToToday()` |
 | Undo last change | `undoLastChange()` ([Dragging](dragging.md)) |
-| Create new task | `createTaskAtToday()` |
 | Zoom in / out | zoom by ×1.5 / ÷1.5 around the center |
 | Day / Week / Month / Year view | zoom to that mode's preset (`VIEW_MODE_ZOOM`) |
 
@@ -25,4 +24,4 @@ Registered in `main.ts`. Each one acts on the Gantt view in the active leaf, or 
 
 ## Creating tasks
 
-`createTaskAtToday()` and `createTaskAtDate()` create a note named "New task" through Bases (`createFileForView`), so it lands where the base expects new notes, with the start (and end, if configured) set in its frontmatter. Without a start property they show a Notice instead. Computed properties are never written. Frappe reports a date click on mousedown of any button, so the view only acts on a plain left click (`mouseDownIsPrimary`). A right-click or Ctrl+click on macOS opens the menu instead.
+`createTaskAtToday()` and `createTaskAtDate()` create a note named "New task" through Bases (`createFileForView`), so it lands where the base expects new notes, with the start (and end, if configured) set in its frontmatter. Bases opens it in a small window with the title selected for renaming, and the properties collapsed. Without a start property they show a Notice instead. Computed properties are never written. Frappe reports a date click on mousedown of any button, so the view only acts on a plain left click (`mouseDownIsPrimary`). A right-click or Ctrl+click on macOS opens the menu instead.

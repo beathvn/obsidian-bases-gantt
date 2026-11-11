@@ -4,8 +4,6 @@ Turn your Obsidian notes into an interactive Gantt chart — drag to reschedule,
 
 Requires **Obsidian 1.13+**.
 
-Based on [Bases Gantt](https://github.com/lhassa8/obsidian-bases-gantt) by Lars Tray. Gantt for Bases is a standalone plugin and doesn't need Bases Gantt installed.
-
 ![Gantt chart showing tasks with dependencies and color coding](screenshots/gantt-demo.png)
 
 ---
@@ -251,12 +249,22 @@ Opens a context menu:
 - **Set progress** — quickly set to 0%, 25%, 50%, 75%, or 100% (unless **Drag to set progress** is off)
 - **Scroll to today** — jump the chart to today's date
 
-### Right-click empty space
-- **Create new task** — creates a new note with today's date
-- **Scroll to today**
+### Creating tasks
 
-### Click an empty date column
-Creates a new task starting on that date. Works from Week zoom inwards, where the day under the pointer is highlighted; at Month and Year zoom a day is too narrow to aim at.
+There are two ways to add a task. They do the same thing and only differ in how you start and which date is used:
+
+| How | Date used |
+|-----|-----------|
+| Right-click an empty spot in the chart and choose **Create new task** | today |
+| Click an empty day column | the day you clicked |
+
+Clicking a day works from Week zoom inwards, where the day under the pointer is highlighted. At Month and Year zoom a day is too narrow to aim at.
+
+**What you get:** a new note called "New task", opened in a small window with its name highlighted, so you can type a name right away. It is created the same way as when you add a note with the **New** button of the base, so it goes wherever the base puts new notes. Its start date is set, and its end date too if the view has an end date property, to the same day, so it starts out as a one-day bar. Nothing else is filled in. Open the window's **Properties** to adjust the dates, or just drag the bar.
+
+If the view has no start date property yet, you see a notice asking you to set one first.
+
+Right-click empty space also has **Scroll to today**.
 
 ### Today button
 The **Today** button in the chart's corner scrolls to today's date.
@@ -299,13 +307,12 @@ Under **Settings → Community plugins → Gantt for Bases**:
 
 ## Command Palette
 
-All commands are available via `Cmd/Ctrl + P`:
+All commands are available via `Cmd/Ctrl + P`, while a Gantt view is open:
 
 | Command | What it does |
 |---------|-------------|
 | **Gantt for Bases: Scroll to today** | Jumps the chart to today's date |
 | **Gantt for Bases: Undo last change** | Reverts the most recent drag |
-| **Gantt for Bases: Create new task** | Creates a new note with today's date pre-filled |
 | **Gantt for Bases: Zoom in** / **Zoom out** | Zoom around the center of the chart |
 | **Gantt for Bases: Day view** | Jump to day-level zoom |
 | **Gantt for Bases: Week view** | Jump to week-level zoom |
@@ -450,7 +457,8 @@ How it works is documented in [docs/](docs/README.md): an architecture overview,
 
 ## Credits
 
-Built on [Bases Gantt](https://github.com/lhassa8/obsidian-bases-gantt) by Lars Tray, and on [Frappe Gantt](https://github.com/frappe/gantt).
+- **[Bases Gantt](https://github.com/lhassa8/obsidian-bases-gantt)** by Lars Tray, the plugin this one is based on. Gantt for Bases is a standalone plugin: you don't need Bases Gantt installed, and the two don't depend on each other.
+- **[Frappe Gantt](https://github.com/frappe/gantt)**, the library that draws the chart.
 
 ## License
 

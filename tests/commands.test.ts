@@ -19,7 +19,6 @@ describe('command palette', () => {
 		expect(names).toEqual([
 			'Scroll to today',
 			'Undo last change',
-			'Create new task',
 			'Zoom in',
 			'Zoom out',
 			'Day view',
