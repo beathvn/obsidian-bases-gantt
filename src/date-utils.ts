@@ -56,6 +56,24 @@ export function taskDaySpan(start: Date, end: Date): { lastDay: Date; days: numb
 }
 
 /**
+ * Keep a resized bar at least one day long. `start` and `end` are Frappe's
+ * dates (`end` is the midnight after the last day) and `edge` is the one
+ * being dragged: it stops where the bar is one day long instead of crossing
+ * the other edge. A bar moved as a whole keeps its length and is not touched.
+ */
+export function keepOneDay(
+	start: Date,
+	end: Date,
+	edge: 'start' | 'end' | 'both',
+): { start: Date; end: Date; clamped: boolean } {
+	const oneDay = (from: Date, days: number) => new Date(from.getFullYear(), from.getMonth(), from.getDate() + days);
+	if (edge === 'both' || end >= oneDay(start, 1)) return { start, end, clamped: false };
+	return edge === 'end'
+		? { start, end: oneDay(start, 1), clamped: true }
+		: { start: oneDay(end, -1), end, clamped: true };
+}
+
+/**
  * Format a Date as YYYY-MM-DD for Frappe Gantt.
  */
 export function formatDateForGantt(date: Date): string {

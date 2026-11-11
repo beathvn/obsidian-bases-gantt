@@ -14,7 +14,7 @@ import {
 import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, GROUP_HEADER_PREFIX, MAX_FIXED_COLORS, type BarColor, type GanttTask, type TaskMapperConfig } from './task-mapper';
-import { formatDateForFrontmatter, parseObsidianDate, taskDaySpan } from './date-utils';
+import { formatDateForFrontmatter, keepOneDay, parseObsidianDate, taskDaySpan } from './date-utils';
 import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll, withRenderCenter, clearLabelFormats } from './zoom';
 import type GanttForBasesPlugin from './main';
 import { PALETTE_VARS, barShades, setBarShades, slotsResembling, type BarShades } from './colors';
@@ -70,6 +70,9 @@ function addDays(date: Date, days: number): Date {
 	return d;
 }
 
+/** A drag in progress tried to shrink a bar below one day, so the bar on screen is out of step with its dates. */
+let dragWasClamped = false;
+
 let barDateMathPatched = false;
 function patchBarDateMath(gantt: Gantt): void {
 	if (barDateMathPatched) return;
@@ -99,10 +102,11 @@ function patchBarDateMath(gantt: Gantt): void {
 		const toSnap = (days: number): number => Math.round(days / snap) * snap;
 		const startShift = startMoved ? toSnap(dayShiftForX(this.gantt, this.dragOrigin.start, x - ox)) : 0;
 		const endShift = endMoved ? startShift + toSnap((width - owidth) / pxPerDay) : 0;
-		return {
-			new_start_date: addDays(this.dragOrigin.start, startShift),
-			new_end_date: addDays(this.dragOrigin.end, endShift),
-		};
+		// A resized edge stops at one day instead of crossing the other edge.
+		const edge = startMoved && endMoved ? 'both' : startMoved ? 'start' : 'end';
+		const kept = keepOneDay(addDays(this.dragOrigin.start, startShift), addDays(this.dragOrigin.end, endShift), edge);
+		if (kept.clamped) dragWasClamped = true;
+		return { new_start_date: kept.start, new_end_date: kept.end };
 	};
 	barDateMathPatched = true;
 }
@@ -392,7 +396,13 @@ export class GanttChartView extends BasesView {
 			this.lastGestureMoved = down !== null && Math.hypot(
 				evt.clientX - down.x, evt.clientY - down.y,
 			) > GanttChartView.CLICK_SLOP_PX;
-			this.finishDrag();
+			const wrote = this.finishDrag();
+			// A clamped resize can leave the bar drawn shorter than its dates;
+			// when nothing was written there is no data update to redraw it.
+			if (dragWasClamped) {
+				dragWasClamped = false;
+				if (!wrote) this.onDataUpdated();
+			}
 		});
 		// Scroll doesn't bubble, but it does pass ancestors in the capture phase.
 		this.registerDomEvent(this.ganttEl, 'scroll', () => {
@@ -514,9 +524,9 @@ export class GanttChartView extends BasesView {
 	}
 
 	/** On mouseup: write the drag's final dates once, then offer undo. */
-	private finishDrag(): void {
+	private finishDrag(): boolean {
 		const batch = this.pendingDrag;
-		if (!batch) return;
+		if (!batch) return false;
 		this.pendingDrag = null;
 
 		this.isDragging = false;
@@ -528,7 +538,7 @@ export class GanttChartView extends BasesView {
 		// Drop no-op changes — e.g. the bar was dragged out and back to
 		// exactly where it started before the mouse was released.
 		batch.changes = batch.changes.filter((c) => !recordsEqual(c.previous, c.next));
-		if (batch.changes.length === 0) return;
+		if (batch.changes.length === 0) return false;
 
 		for (const change of batch.changes) {
 			void this.writeFrontmatter(change.filePath, change.next);
@@ -543,6 +553,7 @@ export class GanttChartView extends BasesView {
 			? `${batch.description} (+${batch.changes.length - 1} dependent)`
 			: batch.description;
 		this.showUndoNotice(label);
+		return true;
 	}
 
 	/** Show a Notice with an inline "Undo" action for a just-applied drag change. */

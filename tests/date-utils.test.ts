@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateForFrontmatter, formatDateForGantt, parseObsidianDate, taskDaySpan } from '../src/date-utils';
+import { formatDateForFrontmatter, formatDateForGantt, parseObsidianDate, keepOneDay, taskDaySpan } from '../src/date-utils';
 
 describe('parseObsidianDate', () => {
 	it('reads a date-only string as local midnight', () => {
@@ -78,5 +78,32 @@ describe('taskDaySpan', () => {
 	it('counts whole days across a daylight saving change', () => {
 		// Europe/Vienna switches to summer time on 2025-03-30.
 		expect(taskDaySpan(new Date(2025, 2, 29), new Date(2025, 2, 31)).days).toBe(2);
+	});
+});
+
+describe('keepOneDay', () => {
+	// Dates as Frappe holds them: _end is the midnight after the last day.
+	const d = (day: number) => new Date(2025, 0, day);
+
+	it('leaves a valid resize alone', () => {
+		expect(keepOneDay(d(10), d(13), 'end')).toEqual({ start: d(10), end: d(13), clamped: false });
+	});
+
+	it('allows shrinking to exactly one day', () => {
+		expect(keepOneDay(d(10), d(11), 'end')).toEqual({ start: d(10), end: d(11), clamped: false });
+	});
+
+	it('stops the end at the start day when it is dragged to or before the start', () => {
+		expect(keepOneDay(d(10), d(10), 'end')).toEqual({ start: d(10), end: d(11), clamped: true });
+		expect(keepOneDay(d(10), d(3), 'end')).toEqual({ start: d(10), end: d(11), clamped: true });
+	});
+
+	it('stops the start at the end day when it is dragged to or past the end', () => {
+		expect(keepOneDay(d(15), d(12), 'start')).toEqual({ start: d(11), end: d(12), clamped: true });
+		expect(keepOneDay(d(12), d(12), 'start')).toEqual({ start: d(11), end: d(12), clamped: true });
+	});
+
+	it('does not touch a bar that is moved as a whole', () => {
+		expect(keepOneDay(d(20), d(23), 'both')).toEqual({ start: d(20), end: d(23), clamped: false });
 	});
 });

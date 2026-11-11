@@ -211,7 +211,7 @@ Optional. Only needed for [tasks you pick up again later](#resuming-a-task-later
 Reschedules the task — changes the start and end dates. The dates are written back to the note's frontmatter automatically. Tasks that depend on it move along by the same amount (this can be turned off in the plugin settings). Drags snap to whole days when the chart shows day columns, and to whole weeks when zoomed out further.
 
 ### Drag the left or right edge of a bar
-Resizes the task — the right edge changes the end date, the left edge the start date. On a task without an end date, dragging the right edge sets one.
+Resizes the task — the right edge changes the end date, the left edge the start date. On a task without an end date, dragging the right edge sets one. A bar can't be made shorter than one day: an edge stops at the other one.
 
 ### Undo
 Every drag shows a notice with an **Undo** button. The **Undo last change** command reverts the most recent drags too, up to 20 back. A drag that also moved dependent tasks is undone as one step.

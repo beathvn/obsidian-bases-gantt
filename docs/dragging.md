@@ -31,6 +31,10 @@ While a drag is in progress (`isDragging`), data updates don't rebuild the chart
 
 Frappe converts a bar's absolute x back to a date by truncating units, which in Month and Year view snaps every drag to the 1st. `patchBarDateMath` replaces this: each edge's **pre-drag date is shifted by whole days** according to how far it moved (`dayShiftForX`). An edge that didn't move keeps its date, and a move keeps the length.
 
+## Minimum length
+
+A resized edge can't cross the other one. `compute_start_end_date` passes the new dates through `keepOneDay()` (`date-utils.ts`), which stops the dragged edge where the bar is one day long. Without it a one-day bar could have its end dragged to the day before its start, and at week snapping a short bar's end jumped back a whole week. A clamped drag sets `dragWasClamped`; if nothing ends up written, the mouseup handler redraws the chart so the bar doesn't stay as short as the pointer left it.
+
 ## Snapping
 
 | Zoom | Step |
