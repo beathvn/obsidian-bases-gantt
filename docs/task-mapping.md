@@ -10,7 +10,7 @@ Each note in the base becomes one bar. Its start, end, label, dependencies, prog
 |---|---|---|---|
 | Start | date properties | `start`, `begin`, `from`, `created` | the first date property |
 | End | date properties | `end`, `due`, `finish`, `deadline`, `until` | the next date property after the start |
-| Dependencies | text properties | `depend`, `block`, `after`, `prerequisite`, `requires` | none |
+| Dependencies | text properties | `depend`, `blocked`, `blocker`, `after`, `prerequisite`, `requires` (`isDependencyName()`; plain `blocks` is left out because it points the other way) | none |
 | Progress | number properties | `progress`, `percent`, `completion`, `complete`, `done` | none |
 | Color by | text properties | `status`, `priority`, `type`, `category`, `phase`, `stage` | none |
 
@@ -36,7 +36,7 @@ flowchart TD
 
 - **Dates** are parsed by `parseObsidianDate()` (`date-utils.ts`): `YYYY-MM-DD` as local midnight (so a date doesn't shift a day in other time zones), `YYYY-MM-DD HH:MM`, ISO datetimes and timestamps. A note whose start can't be read is skipped. An end before the start is drawn one day long (`end = start`). Frappe's `_end` is the midnight after the last day, so the hover popup shows the day before it (`taskDaySpan()`).
 - **IDs** come from the file path, encoded to be CSS-safe (`Notes/A.md` → `Notes_2f_A_2e_md`). Frappe uses them in class names and in comma-separated dependency lists.
-- **Dependencies:** `[[links]]` (aliases allowed) or, without any `[[`, plain comma-separated names resolve to IDs by basename or by path without extension. Links to notes that aren't on the chart are dropped. Frappe draws an arrow from each prerequisite to the task.
+- **Dependencies:** `[[links]]` (aliases allowed) or, without any `[[`, plain comma-separated names resolve to IDs by basename or by path without extension. Links to notes that aren't on the chart are dropped. Frappe draws an arrow from each prerequisite to the task. The property always means "this note waits for these", whichever property it is, so a property that lists what a note blocks would draw backwards.
 - **Order:** by start date, but every task comes after the tasks it depends on, so arrows point down. With circular dependencies, the tasks in the cycle are appended by start date.
 - **Labels:** the **Label** property, or the file name when unset or blank. They are HTML-escaped (`name`), because Frappe writes them with `innerHTML`. `label` keeps the plain text. On the chart a label sits inside its bar in white, or beside the bar when it doesn't fit (Frappe's `auto_move_label`).
 

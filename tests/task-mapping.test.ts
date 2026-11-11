@@ -6,6 +6,7 @@ import {
 	createGroupHeaderTask,
 	escapeHtml,
 	extractRawValue,
+	isDependencyName,
 	mapEntriesToTasks,
 	type GanttTask,
 } from '../src/task-mapper';
@@ -228,4 +229,21 @@ describe('createGroupHeaderTask', () => {
 		const header = createGroupHeaderTask('R&D', 0, [task('2025-01-01', '2025-01-02')])!;
 		expect(header).toMatchObject({ name: 'R&amp;D', label: 'R&D' });
 	});
+});
+
+describe('isDependencyName', () => {
+	// The dependencies property lists the notes this one waits for.
+	it.each(['depends-on', 'dependencies', 'dependsOn', 'after', 'prerequisites', 'requires', 'blocked-by', 'blockedBy', 'blockers'])(
+		'detects %s, which lists what the note waits for',
+		(name) => {
+			expect(isDependencyName(name)).toBe(true);
+		},
+	);
+
+	it.each(['blocks', 'blocking', 'status', 'related'])(
+		'does not detect %s',
+		(name) => {
+			expect(isDependencyName(name)).toBe(false);
+		},
+	);
 });

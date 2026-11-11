@@ -94,7 +94,7 @@ You don't have to use the exact names above. The plugin auto-detects properties 
 - **Start date:** `start`, `begin`, `from`, `created`
 - **End date:** `end`, `due`, `finish`, `deadline`, `until`
 - **Progress:** `progress`, `percent`, `completion`, `complete`, `done` (number properties only)
-- **Dependencies:** `depends`, `blocks`, `after`, `prerequisite`, `requires` (text or link properties only)
+- **Dependencies:** `depends`, `blocked` (as in `blocked-by`), `blocker`, `after`, `prerequisite`, `requires` (text or link properties only). Not `blocks`: see [Dependencies](#dependencies)
 - **Color by:** `status`, `priority`, `type`, `category`, `phase`, `stage` (text properties only)
 
 So `due-date`, `deadline`, `finish-date`, etc. all work as end dates without any configuration. Progress, dependencies and Color by are only guessed when the start date isn't set in the view settings either.
@@ -106,6 +106,10 @@ To link tasks with dependency arrows, add a property with wiki-links to other no
 ```yaml
 depends-on: "[[Task A]], [[Task B]]"
 ```
+
+**The property always lists the notes this one waits for.** Here Task A and Task B have to come first, and the arrows run from them to this task. Put the link on the *later* task.
+
+So a property that says the opposite, like `blocks: "[[Task C]]"` ("this task holds up Task C"), would draw its arrows backwards. That's why `blocks` is **not** picked up automatically. If you track your tasks that way, move the link to the later task as `depends-on` (or `blocked-by`) instead. If you pick a property like `blocks` yourself under **Dependencies** in the view settings, it is still read as "waits for".
 
 You can also use plain comma-separated names (without wiki-link brackets), but wiki-links are recommended because Obsidian will keep them updated if you rename notes.
 
@@ -378,6 +382,9 @@ Open the view settings (gear icon) and select which property contains your start
 
 ### Dates are off by one day
 This can happen if date values include timezone information. Use the plain `YYYY-MM-DD` format (e.g., `2026-03-01`) without time components for best results.
+
+### Dependency arrows point the wrong way
+The dependencies property must list the notes **this one waits for**, so put it on the later task (`depends-on: "[[Earlier task]]"`). A property that lists what a note blocks, like `blocks`, reads backwards.
 
 ### Dependency arrows aren't showing
 - Make sure the dependency property uses wiki-link syntax: `depends-on: "[[Other Note]]"`

@@ -13,7 +13,7 @@ import {
 } from 'obsidian';
 import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
-import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, GROUP_HEADER_PREFIX, MAX_FIXED_COLORS, type BarColor, type GanttTask, type TaskMapperConfig } from './task-mapper';
+import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, isDependencyName, GROUP_HEADER_PREFIX, MAX_FIXED_COLORS, type BarColor, type GanttTask, type TaskMapperConfig } from './task-mapper';
 import { formatDateForFrontmatter, keepOneDay, parseObsidianDate, taskDaySpan } from './date-utils';
 import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll, withRenderCenter, clearLabelFormats } from './zoom';
 import type GanttForBasesPlugin from './main';
@@ -867,8 +867,7 @@ export class GanttChartView extends BasesView {
 		if (!end) end = dateProps.find(p => p !== start) ?? null;
 
 		// Dependencies: look for link-like string properties
-		const depKeywords = ['depend', 'block', 'after', 'prerequisite', 'requires'];
-		const dependencies = findByKeywords(stringProps, depKeywords);
+		const dependencies = stringProps.find((propId) => isDependencyName(getName(propId))) ?? null;
 
 		// Progress: look for number properties with progress-like names
 		const progressKeywords = ['progress', 'percent', 'completion', 'complete', 'done'];

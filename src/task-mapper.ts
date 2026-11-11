@@ -75,6 +75,20 @@ function makeTaskId(filePath: string): string {
 	return filePath.replace(/[^A-Za-z0-9-]/gu, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
 }
 
+/**
+ * Name parts that mark a property as the dependencies. The property lists the
+ * notes a note waits for, so "blocked-by" and "blockers" fit, but "blocks"
+ * ("this note holds up those") says the opposite and would draw the arrows
+ * backwards: it is left out.
+ */
+const DEPENDENCY_KEYWORDS = ['depend', 'blocked', 'blocker', 'after', 'prerequisite', 'requires'];
+
+/** Whether a property name (any case) looks like the dependencies property. */
+export function isDependencyName(name: string): boolean {
+	const lower = name.toLowerCase();
+	return DEPENDENCY_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
+
 /** Escape text for safe insertion as HTML. */
 export function escapeHtml(str: string): string {
 	return str
