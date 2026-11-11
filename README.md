@@ -77,7 +77,6 @@ The Gantt chart reads frontmatter properties from your notes. Here's what it can
 
 | Property | What it does | Example |
 |----------|-------------|---------|
-| **Planned start** | When you plan to (re)start working on it, e.g. a project you started long ago and pick up again next month. The bar then begins here; the start date stays as the record of when it began. | `plannedStart: 2026-11-02` |
 | **End date** | When the task ends. If omitted, the bar is drawn with a default length (1 day, adjustable in the plugin settings). | `end-date: 2026-03-05` |
 | **Progress** | Completion percentage (0–100). Enables the progress bar on the task. Can also be a formula, e.g. [computed from the note's tasks](#progress-from-task-counts). | `progress: 40` |
 | **Dependencies** | Wiki-links to notes that must finish first. Shows arrows between bars. | `depends-on: "[[Design]]"` |
@@ -94,7 +93,7 @@ You don't have to use the exact names above. The plugin auto-detects properties 
 - **Dependencies:** `depends`, `blocks`, `after`, `prerequisite`, `requires` (text or link properties only)
 - **Color by:** `status`, `priority`, `type`, `category`, `phase`, `stage` (text properties only)
 
-So `due-date`, `deadline`, `finish-date`, etc. all work as end dates without any configuration. Progress, dependencies and Color by are only guessed when the start date isn't set in the view settings either. A property named `plannedStart` is used as the [planned start](#configuring-the-view) automatically.
+So `due-date`, `deadline`, `finish-date`, etc. all work as end dates without any configuration. Progress, dependencies and Color by are only guessed when the start date isn't set in the view settings either.
 
 ### Dependencies
 
@@ -116,6 +115,26 @@ start-date: 2026-03-15
 end-date: 2026-03-15
 ---
 ```
+
+### Resuming a task later (optional)
+
+You can ignore this unless you have tasks you started a while ago and are now picking up again.
+
+Say a project began in January 2024, then sat untouched, and you plan to work on it again from November 2026. With only a start date, its bar would stretch across almost three years of nothing. Give the note a **planned start** instead:
+
+```yaml
+---
+start-date: 2024-01-10
+plannedStart: 2026-11-02
+end-date: 2026-12-15
+---
+```
+
+The bar now begins on 2 November 2026. The start date stays in the note as the record of when the project began, and a faint dotted line on the chart leads back to it. Hovering over the bar also shows "Started 10 Jan 2024".
+
+- Dragging such a bar moves the **planned start**, not the start date. The Undo notice says so: *Moved "Project" (planned start)*.
+- A property named `plannedStart` is picked up automatically. To use another one, set **Planned start** under **Advanced** in the view settings.
+- The dotted line can be turned off with **Show original start** in the same group.
 
 ### Progress from task counts
 
@@ -159,7 +178,6 @@ Click the **gear icon** in the view header to open the Gantt settings panel.
 If auto-detection picks the wrong properties (or you want to override it), you can manually assign each one:
 
 - **Start date** — Which date property to use as the bar's start
-- **Planned start** — Which date property holds a planned (re)start. When a note has one, its bar begins there, and dragging the bar moves the planned start instead of the start date. Defaults to a property named `plannedStart`.
 - **End date** — Which date property to use as the bar's end
 - **Label** — Which property to use as the bar's label (defaults to file name)
 - **Dependencies** — Which property contains dependency links
@@ -176,8 +194,14 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 - **Show progress** — Toggle the progress bar overlay on tasks. Turns on by itself when a progress property is detected and you haven't set the toggle yet
 - **Show expected progress** — When progress is shown, adds a dashed line indicating where progress *should* be based on how much time has elapsed
 - **Drag to set progress** — When progress is shown, lets you change it on the chart by dragging a handle or from the right-click menu (on by default). Only works when **Progress** is a plain number property in the notes, not a formula
-- **Show original start** — For bars that begin at a planned start, draw a faint dotted line back to the note's own start date
 - **Show details on hover** — Show a popup with the task's dates, progress, dependencies, chosen properties and a preview of the note when you hover over a bar (on by default)
+
+### Advanced
+
+Optional. Only needed for [tasks you pick up again later](#resuming-a-task-later-optional). Leave it alone otherwise.
+
+- **Planned start** — Which date property holds the day you resume. When a note has one, its bar begins there, and dragging the bar moves it instead of the start date. Defaults to a property named `plannedStart`.
+- **Show original start** — For bars that begin at a planned start, draw a faint dotted line back to the note's own start date (on by default; it only appears on those bars)
 
 ---
 

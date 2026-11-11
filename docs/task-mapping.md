@@ -35,7 +35,7 @@ flowchart TD
     T --> S[sortByDependencies]
 ```
 
-- **Dates** are parsed by `parseObsidianDate()` (`date-utils.ts`): `YYYY-MM-DD` as local midnight (so a date doesn't shift a day in other time zones), `YYYY-MM-DD HH:MM`, ISO datetimes and timestamps. A note whose start can't be read is skipped. An end before the start is drawn one day long.
+- **Dates** are parsed by `parseObsidianDate()` (`date-utils.ts`): `YYYY-MM-DD` as local midnight (so a date doesn't shift a day in other time zones), `YYYY-MM-DD HH:MM`, ISO datetimes and timestamps. A note whose start can't be read is skipped. An end before the start is drawn one day long (`end = start`, not a milestone). Frappe's `_end` is the midnight after the last day, so the hover popup shows the day before it (`taskDaySpan()`).
 - **IDs** come from the file path, encoded to be CSS-safe (`Notes/A.md` → `Notes_2f_A_2e_md`). Frappe uses them in class names and in comma-separated dependency lists.
 - **Dependencies:** `[[links]]` (aliases allowed) or, without any `[[`, plain comma-separated names resolve to IDs by basename or by path without extension. Links to notes that aren't on the chart are dropped. Frappe draws an arrow from each prerequisite to the task.
 - **Order:** by start date, but every task comes after the tasks it depends on, so arrows point down. With circular dependencies, the tasks in the cycle are appended by start date.
@@ -43,7 +43,7 @@ flowchart TD
 
 ## Milestones
 
-A task whose end equals its start is a milestone (`isMilestone`). Frappe can't draw a zero-length bar, so it is drawn one day long, with rounded corners and slightly faded (`.gantt-milestone`). Frappe throws on a `custom_class` with a space, so the milestone class can't be combined with a color class there: a colored milestone gets its color class from the mapper, and `afterRender()` adds `gantt-milestone` to its bar afterwards.
+A task whose end equals its start is a milestone (`isMilestone`). Frappe counts a date-only end as a full day, so `end = start` is already one day long and needs no padding. It is drawn with rounded corners and slightly faded (`.gantt-milestone`). Frappe throws on a `custom_class` with a space, so the milestone class can't be combined with a color class there: a colored milestone gets its color class from the mapper, and `afterRender()` adds `gantt-milestone` to its bar afterwards.
 
 ## Grouping
 

@@ -163,17 +163,20 @@ export function mapEntriesToTasks(
 			const endVal = entry.getValue(config.endProperty);
 			endDate = parseObsidianDate(extractRawValue(endVal));
 		}
+		// Frappe draws an end date as a full day, so `end` is the last day of
+		// the bar: a task starting and ending on the same day is one day long.
 		// Default: if no end date, show the task with the configured length
 		const hasEnd = endDate != null;
+		// A note that really ends on its start day is a milestone.
+		const isMilestone = endDate != null && endDate.getTime() === startDate.getTime();
 		if (!endDate) {
 			endDate = new Date(startDate);
-			endDate.setDate(endDate.getDate() + config.defaultDurationDays);
+			endDate.setDate(endDate.getDate() + Math.max(1, config.defaultDurationDays) - 1);
 		}
 
-		// Ensure end >= start
+		// Ensure end >= start (an end before the start is drawn one day long)
 		if (endDate < startDate) {
 			endDate = new Date(startDate);
-			endDate.setDate(endDate.getDate() + 1);
 		}
 
 		// Label
@@ -243,12 +246,8 @@ export function mapEntriesToTasks(
 			}
 		}
 
-		// Milestone: start === end → render as a very short bar (Frappe handles this)
-		const isMilestone = startDate.getTime() === endDate.getTime();
+		// Milestone: start === end → a one-day bar styled as a marker
 		if (isMilestone) {
-			// Give milestones a minimal duration so Frappe can render them
-			endDate = new Date(startDate);
-			endDate.setDate(endDate.getDate() + 1);
 			// Note: custom_class must NOT contain spaces — classList.add() in
 			// Frappe Gantt's bar.refresh() throws DOMException on spaces.
 			// Use only a single class; milestone styling is secondary to color.

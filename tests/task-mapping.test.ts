@@ -66,14 +66,14 @@ describe('mapEntriesToTasks: bars', () => {
 
 	it('draws an end before the start as one day long', () => {
 		const [task] = map([entry('A.md', { start: '2025-01-10', end: '2025-01-01' })]);
-		expect(task).toMatchObject({ start: '2025-01-10', end: '2025-01-11' });
+		expect(task).toMatchObject({ start: '2025-01-10', end: '2025-01-10', isMilestone: false });
 	});
 });
 
 describe('mapEntriesToTasks: milestones', () => {
 	it('marks a task ending on its start day as a one-day milestone', () => {
 		const [task] = map([entry('A.md', { start: '2025-01-10', end: '2025-01-10' })]);
-		expect(task).toMatchObject({ isMilestone: true, end: '2025-01-11', custom_class: 'gantt-milestone' });
+		expect(task).toMatchObject({ isMilestone: true, end: '2025-01-10', custom_class: 'gantt-milestone' });
 	});
 
 	it('keeps the color class of a colored milestone', () => {

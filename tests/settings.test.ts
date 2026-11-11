@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BasesViewConfig } from 'obsidian';
 import { loadedPlugin } from './support/plugin';
 import { DEFAULT_SETTINGS } from '../src/settings';
-import { getGanttViewOptions } from '../src/gantt-view';
+import { getGanttViewOptions, moveDescription } from '../src/gantt-view';
 
 describe('plugin settings', () => {
 	it('starts from the defaults without stored data', async () => {
@@ -36,10 +36,11 @@ describe('view options', () => {
 	const item = (key: string, values: Record<string, unknown> = {}) =>
 		items(values).flatMap((g) => g.items).find((i) => i.key === key)!;
 
-	it('groups the options into Properties and Display', () => {
+	it('keeps the planned start options out of the main groups, in an Advanced group', () => {
 		expect(items().map((g) => [g.displayName, g.items.map((i) => i.displayName)])).toEqual([
-			['Properties', ['Start date', 'Planned start', 'End date', 'Label', 'Dependencies', 'Color by', 'Progress']],
-			['Display', ['Bar height', 'Show progress', 'Show expected progress', 'Drag to set progress', 'Show original start', 'Show details on hover']],
+			['Properties', ['Start date', 'End date', 'Label', 'Dependencies', 'Color by', 'Progress']],
+			['Display', ['Bar height', 'Show progress', 'Show expected progress', 'Drag to set progress', 'Show details on hover']],
+			['Advanced', ['Planned start', 'Show original start']],
 		]);
 	});
 
@@ -54,10 +55,24 @@ describe('view options', () => {
 	it.each([
 		['showProgress', false],
 		['editProgress', true],
-		['showOriginalStart', false],
+		['showOriginalStart', true],
 		['showPopup', true],
 		['barHeight', 30],
 	])('defaults %s to %s', (key, value) => {
 		expect(item(key).default).toBe(value);
+	});
+});
+
+describe('drag notice wording', () => {
+	it('names the task', () => {
+		expect(moveDescription('Design', { startsPlanned: false, startMoved: true })).toBe('Moved "Design"');
+	});
+
+	it('says the planned start moved when a bar from a planned start is moved', () => {
+		expect(moveDescription('Design', { startsPlanned: true, startMoved: true })).toBe('Moved "Design" (planned start)');
+	});
+
+	it('does not mention the planned start when only the end was resized', () => {
+		expect(moveDescription('Design', { startsPlanned: true, startMoved: false })).toBe('Moved "Design"');
 	});
 });

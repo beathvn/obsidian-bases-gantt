@@ -8,8 +8,9 @@ Defined in `getGanttViewOptions()` and stored by Bases in the `.base` file.
 
 | Group | Option |
 |---|---|
-| Properties | Start date, Planned start, End date, Label, Dependencies, Color by, Progress |
-| Display | Bar height, Show progress, Show expected progress, Drag to set progress, Show original start, Show details on hover |
+| Properties | Start date, End date, Label, Dependencies, Color by, Progress |
+| Display | Bar height, Show progress, Show expected progress, Drag to set progress, Show details on hover |
+| Advanced | Planned start, Show original start (on by default) |
 
 A change triggers `onDataUpdated()`. Options that affect the chart's structure are part of the config snapshot and rebuild it. The rest are read on each render or hover.
 

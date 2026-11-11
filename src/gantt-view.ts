@@ -14,7 +14,7 @@ import {
 import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
 import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, GROUP_HEADER_PREFIX, MAX_FIXED_COLORS, type BarColor, type GanttTask, type TaskMapperConfig } from './task-mapper';
-import { formatDateForFrontmatter, parseObsidianDate } from './date-utils';
+import { formatDateForFrontmatter, parseObsidianDate, taskDaySpan } from './date-utils';
 import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll, withRenderCenter, clearLabelFormats } from './zoom';
 import type GanttForBasesPlugin from './main';
 import { PALETTE_VARS, barShades, setBarShades, slotsResembling, type BarShades } from './colors';
@@ -976,7 +976,11 @@ export class GanttChartView extends BasesView {
 				}
 
 				// Written once on mouseup by finishDrag(), not per tick.
-				this.recordDragChange(ganttTask.filePath, `Moved "${ganttTask.label}"`, previous, updates);
+				const description = moveDescription(ganttTask.label, {
+					startsPlanned: ganttTask.startsPlanned,
+					startMoved: newStart !== ganttTask.start,
+				});
+				this.recordDragChange(ganttTask.filePath, description, previous, updates);
 			},
 
 			// Fired once, on release of the progress handle.
@@ -1039,7 +1043,8 @@ export class GanttChartView extends BasesView {
 		// every zoom frame, so bars kept collapsing and regrowing whenever a
 		// zoom gesture paused or ended; draw them at their size right away.
 		this.gantt.$svg.querySelectorAll('animate').forEach((animation) => animation.remove());
-		const showOriginalStart = this.config.get('showOriginalStart') === true;
+		// On unless turned off in the view's options.
+		const showOriginalStart = this.config.get('showOriginalStart') !== false;
 		drawQuarterBackdrop(this.gantt);
 		// Milestone class can't be combined with the color class in
 		// custom_class: Frappe Gantt throws on spaces in classList.add.
@@ -1074,9 +1079,9 @@ export class GanttChartView extends BasesView {
 		const start = ctx.task._start;
 		const end = ctx.task._end;
 		if (start && end) {
-			const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+			const { lastDay, days } = taskDaySpan(start, end);
 			ctx.set_subtitle(
-				`${this.formatDisplayDate(start)} &rarr; ${this.formatDisplayDate(end)} &middot; ${days} day${days !== 1 ? 's' : ''}`
+				`${this.formatDisplayDate(start)} &rarr; ${this.formatDisplayDate(lastDay)} &middot; ${days} day${days !== 1 ? 's' : ''}`
 			);
 		}
 
@@ -1463,6 +1468,19 @@ export class GanttChartView extends BasesView {
 }
 
 /**
+ * Undo-notice text for a dragged task. Says so when the planned start was
+ * moved instead of the start date, so it is clear which property changed.
+ */
+export function moveDescription(
+	label: string,
+	drag: { startsPlanned: boolean; startMoved: boolean },
+): string {
+	return drag.startsPlanned && drag.startMoved
+		? `Moved "${label}" (planned start)`
+		: `Moved "${label}"`;
+}
+
+/**
  * Return the view options for the Bases config sidebar.
  */
 export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] {
@@ -1476,12 +1494,6 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 					key: 'startDate',
 					displayName: 'Start date',
 					placeholder: 'Select property...',
-				},
-				{
-					type: 'property',
-					key: 'plannedStart',
-					displayName: 'Planned start',
-					placeholder: 'plannedStart (default)',
 				},
 				{
 					type: 'property',
@@ -1551,14 +1563,26 @@ export function getGanttViewOptions(config: BasesViewConfig): BasesAllOptions[] 
 				},
 				{
 					type: 'toggle',
-					key: 'showOriginalStart',
-					displayName: 'Show original start',
-					default: false,
+					key: 'showPopup',
+					displayName: 'Show details on hover',
+					default: true,
+				},
+			],
+		},
+		{
+			type: 'group',
+			displayName: 'Advanced',
+			items: [
+				{
+					type: 'property',
+					key: 'plannedStart',
+					displayName: 'Planned start',
+					placeholder: 'plannedStart (default)',
 				},
 				{
 					type: 'toggle',
-					key: 'showPopup',
-					displayName: 'Show details on hover',
+					key: 'showOriginalStart',
+					displayName: 'Show original start',
 					default: true,
 				},
 			],
