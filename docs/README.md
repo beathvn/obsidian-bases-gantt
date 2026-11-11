@@ -70,3 +70,12 @@ Frappe has few extension points, so behavior is changed by replacing methods:
 | Properties, display toggles | View config in the `.base` file | Per view, shared via sync. |
 | Scroll position, zoom | Local storage, keyed by base path and view name | Per device, changes constantly; keeps the `.base` file out of git noise. |
 | Plugin settings, color assignments | Plugin `data.json` | Global to the vault. |
+
+## Tests
+
+Tests use [Vitest](https://vitest.dev) in a jsdom environment: `npm test` runs them once, `npm run test:watch` keeps them running. They live in `tests/`, one file per feature page above (`tests/zoom.test.ts` for [Zoom](zoom.md), …), plus `date-utils.test.ts` and `commands.test.ts`. CI runs them after the build and lint.
+
+- **`obsidian` stand-in:** the `obsidian` package only ships types, so `vitest.config.mts` aliases it to `tests/support/obsidian.ts`, a few minimal classes (`DateValue`, `Plugin`, `debounce`, …).
+- **Helpers:** `entry()` and `config()` (`tests/support/entries.ts`) build Bases entries and mapper configs, `loadedPlugin()` a plugin with given stored settings, `chartAt()` the part of a Frappe chart its date ↔ x math reads.
+- **Time zone:** tests run in `Europe/Vienna`, so date math is checked the same way everywhere, DST switches included.
+- **Not covered yet:** what lives inside `GanttChartView` (property auto-detection, writing drags and progress to frontmatter, undo, popup, menus, scroll state). It needs Bases and the workspace, so test it by moving the logic into plain functions first.

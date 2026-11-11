@@ -31,4 +31,10 @@ export default defineConfig(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		// Runs in Node when the tests start, not in Obsidian.
+		files: ['vitest.config.mts'],
+		languageOptions: { globals: { ...(globals as { node: Record<string, boolean> }).node } },
+		rules: { 'obsidianmd/no-nodejs-modules': 'off' },
+	},
 );

@@ -1,0 +1,235 @@
+import { describe, expect, it } from 'vitest';
+import { DateValue, NullValue, NumberValue, StringValue } from './support/obsidian';
+import { anyColor, config, entry } from './support/entries';
+import {
+	GROUP_HEADER_PREFIX,
+	createGroupHeaderTask,
+	escapeHtml,
+	extractRawValue,
+	mapEntriesToTasks,
+	type GanttTask,
+} from '../src/task-mapper';
+import type { Value } from 'obsidian';
+
+const map = (entries: ReturnType<typeof entry>[], overrides = {}) =>
+	mapEntriesToTasks(entries, config(overrides), anyColor);
+
+const names = (tasks: GanttTask[]) => tasks.map((t) => t.label);
+
+describe('extractRawValue', () => {
+	it('returns null for a missing value', () => {
+		expect(extractRawValue(null)).toBeNull();
+	});
+
+	it('returns null for a null value', () => {
+		expect(extractRawValue(new NullValue() as unknown as Value)).toBeNull();
+	});
+
+	it('drops the time of a datetime value', () => {
+		const value = new DateValue(new Date(2025, 4, 6, 13, 45), true) as unknown as Value;
+		expect(extractRawValue(value)).toBe('2025-05-06');
+	});
+
+	it('returns other values as text', () => {
+		expect(extractRawValue(new NumberValue(42) as unknown as Value)).toBe('42');
+		expect(extractRawValue(new StringValue('hi') as unknown as Value)).toBe('hi');
+	});
+});
+
+describe('escapeHtml', () => {
+	it('escapes every HTML special character', () => {
+		expect(escapeHtml(`<a href="x">Tom & Jerry's</a>`)).toBe(
+			'&lt;a href=&quot;x&quot;&gt;Tom &amp; Jerry&#39;s&lt;/a&gt;',
+		);
+	});
+});
+
+describe('mapEntriesToTasks: bars', () => {
+	it('maps nothing without a start property', () => {
+		expect(map([entry('A.md', { start: '2025-01-01' })], { startProperty: null })).toEqual([]);
+	});
+
+	it('skips notes without a start date', () => {
+		const tasks = map([entry('A.md', { start: '2025-01-01' }), entry('B.md'), entry('C.md', { start: 'soon' })]);
+		expect(names(tasks)).toEqual(['A']);
+	});
+
+	it('takes start and end from the note', () => {
+		const [task] = map([entry('A.md', { start: '2025-01-01', end: '2025-01-10' })]);
+		expect(task).toMatchObject({ start: '2025-01-01', end: '2025-01-10', hasEnd: true, filePath: 'A.md' });
+	});
+
+	it('reads date values Bases hands over', () => {
+		const [task] = map([entry('A.md', { start: new Date(2025, 0, 1), end: new Date(2025, 0, 3) })]);
+		expect(task).toMatchObject({ start: '2025-01-01', end: '2025-01-03' });
+	});
+
+	it('draws an end before the start as one day long', () => {
+		const [task] = map([entry('A.md', { start: '2025-01-10', end: '2025-01-01' })]);
+		expect(task).toMatchObject({ start: '2025-01-10', end: '2025-01-11' });
+	});
+});
+
+describe('mapEntriesToTasks: milestones', () => {
+	it('marks a task ending on its start day as a one-day milestone', () => {
+		const [task] = map([entry('A.md', { start: '2025-01-10', end: '2025-01-10' })]);
+		expect(task).toMatchObject({ isMilestone: true, end: '2025-01-11', custom_class: 'gantt-milestone' });
+	});
+
+	it('keeps the color class of a colored milestone', () => {
+		const [task] = mapEntriesToTasks(
+			[entry('A.md', { start: '2025-01-10', end: '2025-01-10', status: 'done' })],
+			config({ colorByProperty: 'note.status' }),
+			() => ({ slot: 3 }),
+		);
+		expect(task.custom_class).toBe('gantt-color-3');
+	});
+
+	it('does not mark a longer task', () => {
+		const [task] = map([entry('A.md', { start: '2025-01-10', end: '2025-01-12' })]);
+		expect(task.isMilestone).toBe(false);
+	});
+});
+
+describe('mapEntriesToTasks: IDs', () => {
+	it('encodes the file path into a CSS-safe ID', () => {
+		const [task] = map([entry('Notes/A.md', { start: '2025-01-01' })]);
+		expect(task.id).toBe('Notes_2f_A_2e_md');
+	});
+
+	it('gives paths that differ only in "_" or "/" different IDs', () => {
+		const tasks = map([
+			entry('a_2f_b.md', { start: '2025-01-01' }),
+			entry('a/b.md', { start: '2025-01-01' }),
+		]);
+		expect(new Set(tasks.map((t) => t.id)).size).toBe(2);
+	});
+
+	it('uses only letters, digits, "-" and "_"', () => {
+		const [task] = map([entry('Projekte/Über, "Plan" #1.md', { start: '2025-01-01' })]);
+		expect(task.id).toMatch(/^[A-Za-z0-9_-]+$/);
+	});
+});
+
+describe('mapEntriesToTasks: labels', () => {
+	it('uses the file name by default', () => {
+		const [task] = map([entry('folder/My task.md', { start: '2025-01-01' })]);
+		expect(task.label).toBe('My task');
+	});
+
+	it('uses the label property when set', () => {
+		const [task] = map([entry('A.md', { start: '2025-01-01', title: 'Launch' })], { labelProperty: 'note.title' });
+		expect(task.label).toBe('Launch');
+	});
+
+	it('falls back to the file name for a blank label', () => {
+		const [task] = map([entry('A.md', { start: '2025-01-01', title: '  ' })], { labelProperty: 'note.title' });
+		expect(task.label).toBe('A');
+	});
+
+	it('HTML-escapes the name Frappe renders but keeps the plain label', () => {
+		const [task] = map([entry('A.md', { start: '2025-01-01', title: '<img src=x onerror=alert(1)>' })], {
+			labelProperty: 'note.title',
+		});
+		expect(task.name).toBe('&lt;img src=x onerror=alert(1)&gt;');
+		expect(task.label).toBe('<img src=x onerror=alert(1)>');
+	});
+});
+
+describe('mapEntriesToTasks: dependencies', () => {
+	const withDeps = (deps: string, others = [entry('folder/Design.md', { start: '2025-01-01' })]) => {
+		const tasks = map([...others, entry('Build.md', { start: '2025-02-01', after: deps })], {
+			dependenciesProperty: 'note.after',
+		});
+		return tasks.find((t) => t.label === 'Build')!.dependencies;
+	};
+
+	it('resolves a [[link]] by basename', () => {
+		expect(withDeps('[[Design]]')).toBe('folder_2f_Design_2e_md');
+	});
+
+	it('resolves a [[link]] by path', () => {
+		expect(withDeps('[[folder/Design]]')).toBe('folder_2f_Design_2e_md');
+	});
+
+	it('resolves an aliased [[link|alias]]', () => {
+		expect(withDeps('[[Design|the design]]')).toBe('folder_2f_Design_2e_md');
+	});
+
+	it('resolves several links, comma-separated in the result', () => {
+		const others = [entry('Design.md', { start: '2025-01-01' }), entry('Spec.md', { start: '2025-01-02' })];
+		expect(withDeps('[[Design]], [[Spec]]', others)).toBe('Design_2e_md, Spec_2e_md');
+	});
+
+	it('resolves plain comma-separated names', () => {
+		const others = [entry('Design.md', { start: '2025-01-01' }), entry('Spec.md', { start: '2025-01-02' })];
+		expect(withDeps('Design, Spec', others)).toBe('Design_2e_md, Spec_2e_md');
+	});
+
+	it('ignores links to notes outside the base', () => {
+		expect(withDeps('[[Elsewhere]]')).toBe('');
+	});
+});
+
+describe('mapEntriesToTasks: order', () => {
+	it('sorts by start date', () => {
+		const tasks = map([
+			entry('C.md', { start: '2025-03-01' }),
+			entry('A.md', { start: '2025-01-01' }),
+			entry('B.md', { start: '2025-02-01' }),
+		]);
+		expect(names(tasks)).toEqual(['A', 'B', 'C']);
+	});
+
+	it('puts a task after the tasks it depends on, even if it starts earlier', () => {
+		const tasks = map(
+			[
+				entry('Early.md', { start: '2025-01-01', after: '[[Late]]' }),
+				entry('Middle.md', { start: '2025-01-15' }),
+				entry('Late.md', { start: '2025-02-01' }),
+			],
+			{ dependenciesProperty: 'note.after' },
+		);
+		expect(names(tasks)).toEqual(['Middle', 'Late', 'Early']);
+	});
+
+	it('keeps every task when dependencies are circular', () => {
+		const tasks = map(
+			[
+				entry('A.md', { start: '2025-01-02', after: '[[B]]' }),
+				entry('B.md', { start: '2025-01-01', after: '[[A]]' }),
+			],
+			{ dependenciesProperty: 'note.after' },
+		);
+		expect(names(tasks)).toEqual(['B', 'A']);
+	});
+});
+
+describe('createGroupHeaderTask', () => {
+	const task = (start: string, end: string) =>
+		map([entry(`${start}.md`, { start, end })])[0];
+
+	it('returns null for an empty group', () => {
+		expect(createGroupHeaderTask('Empty', 0, [])).toBeNull();
+	});
+
+	it('spans the dates of all tasks in the group', () => {
+		const header = createGroupHeaderTask('Team', 2, [
+			task('2025-02-01', '2025-02-10'),
+			task('2025-01-05', '2025-01-08'),
+			task('2025-01-20', '2025-03-01'),
+		])!;
+		expect(header).toMatchObject({
+			id: `${GROUP_HEADER_PREFIX}2`,
+			start: '2025-01-05',
+			end: '2025-03-01',
+			custom_class: 'gantt-group-header',
+			filePath: '',
+		});
+	});
+
+	it('escapes the group label', () => {
+		const header = createGroupHeaderTask('R&D', 0, [task('2025-01-01', '2025-01-02')])!;
+		expect(header).toMatchObject({ name: 'R&amp;D', label: 'R&D' });
+	});
+});
