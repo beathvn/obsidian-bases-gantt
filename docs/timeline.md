@@ -14,6 +14,7 @@ Frappe draws two header rows per view mode. The plugin replaces the lower row's 
 - **Week numbers** are ISO 8601 (`getISOWeekNumber()`), and Week columns start on Monday (`setup_dates` patch).
 - **Fitting:** `fittingFormat()` measures the widest possible label of each format in the theme's interface font and the chart's language, and picks the first that fits 80 % of the column. The choice is made once per zoom level, so all columns use the same format. It is forgotten on theme changes (`clearLabelFormats()`), since the font may have changed.
 - Labels are never empty: Frappe skips empty ones, and click-to-create maps a click to a column by its label.
+- **Scrolls with the grid:** Frappe makes the header sticky at `left: 0` as well as `top: 0`. The header is as wide as the grid, so that normally changes nothing, but if the scrollable area is even a few pixels wider, the header stays put for that many pixels of scrolling and is then offset from the grid. `gantt-overrides.css` keeps only the top pin (`left: auto`).
 - Year and Day use Frappe's own labels.
 
 ## Grid shading

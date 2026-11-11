@@ -36,6 +36,16 @@
 }
 
 /* Sticky header */
+
+/* Frappe pins the header at left: 0 as well as top: 0. It is as wide as the grid, so that
+   normally does nothing, but when the scrollable area is a few pixels wider than the header
+   (anything overhanging the grid's right edge), the header stays still for the first few
+   pixels of scrolling while the grid moves, and then stays offset from it. Pin it at the
+   top only, so it always scrolls with the grid. */
+.gantt-for-bases-view .gantt-container .grid-header {
+	left: auto;
+}
+
 .gantt-for-bases-view .gantt-container .current-upper {
 	background: var(--background-primary);
 }
