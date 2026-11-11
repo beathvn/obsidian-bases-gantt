@@ -22,8 +22,8 @@ Defined in `settings.ts` (`GanttForBasesSettings`, `GanttForBasesSettingTab`) an
 
 | Setting | Used by |
 |---|---|
-| Move dependent tasks along | [Dragging](dragging.md) |
-| Default length without end date | [Open-ended tasks](open-ended-tasks.md) |
+| Move dependent notes along | [Dragging](dragging.md) |
+| Default length without end date | [Open-ended notes](open-ended-notes.md) |
 | Hover group: Show details on hover, Properties on hover, Note preview on hover | [Hover popup](hover-popup.md) |
 | Value colors | [Colors](colors.md) |
 | *(hidden)* color assignments | [Colors](colors.md) |

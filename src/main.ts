@@ -1,6 +1,6 @@
 import { Plugin, debounce } from 'obsidian';
 import { GanttChartView, getGanttViewOptions } from './gantt-view';
-import { COLOR_CLASS_COUNT, MAX_FIXED_COLORS } from './task-mapper';
+import { COLOR_CLASS_COUNT, MAX_FIXED_COLORS } from './note-mapper';
 import { GanttForBasesSettings, GanttForBasesSettingTab, DEFAULT_SETTINGS } from './settings';
 
 export default class GanttForBasesPlugin extends Plugin {

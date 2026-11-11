@@ -104,7 +104,7 @@
 
 /* ── Day hover / click target ────────────────────────────────────── */
 
-/* One transparent rect over the grid takes the clicks that create a task;
+/* One transparent rect over the grid takes the clicks that create a note;
    the day under the pointer is highlighted by a single moving rect. */
 /* :hover too, over Frappe's own .grid-column:hover fill. */
 .gantt-for-bases-view .gantt .gantt-click-target,
@@ -173,7 +173,7 @@
 	--gantt-progress: var(--gantt-palette-7-progress);
 }
 
-/* "Value colors" entries, shades resolved per view (MAX_FIXED_COLORS in task-mapper.ts). */
+/* "Value colors" entries, shades resolved per view (MAX_FIXED_COLORS in note-mapper.ts). */
 .gantt-for-bases-view .gantt .bar-wrapper.gantt-fixed-0 {
 	--gantt-fill: var(--gantt-fixed-0-fill);
 	--gantt-hover: var(--gantt-fixed-0-hover);

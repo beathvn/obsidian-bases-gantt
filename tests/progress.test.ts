@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { anyColor, config, entry } from './support/entries';
-import { mapEntriesToTasks } from '../src/task-mapper';
+import { mapEntriesToNotes } from '../src/note-mapper';
 
 const progressOf = (value: string | number | null, overrides = {}) =>
-	mapEntriesToTasks(
+	mapEntriesToNotes(
 		[entry('A.md', { start: '2025-01-01', progress: value })],
 		config({ showProgress: true, progressProperty: 'note.progress', ...overrides }),
 		anyColor,

@@ -13,8 +13,8 @@ import {
 } from 'obsidian';
 import Gantt from 'frappe-gantt';
 import type { GanttOptions, PopupContext } from 'frappe-gantt';
-import { mapEntriesToTasks, createGroupHeaderTask, escapeHtml, extractRawValue, isDependencyName, GROUP_HEADER_PREFIX, MAX_FIXED_COLORS, type BarColor, type GanttTask, type TaskMapperConfig } from './task-mapper';
-import { formatDateForFrontmatter, keepOneDay, parseObsidianDate, taskDaySpan } from './date-utils';
+import { mapEntriesToNotes, createGroupHeaderBar, escapeHtml, extractRawValue, isDependencyName, GROUP_HEADER_PREFIX, MAX_FIXED_COLORS, type BarColor, type GanttNote, type NoteMapperConfig } from './note-mapper';
+import { formatDateForFrontmatter, keepOneDay, parseObsidianDate, barDaySpan } from './date-utils';
 import { DAYS_PER_UNIT, VIEW_MODE_ZOOM, ZoomController, dayShiftForX, dragSnapDays, xForDate, drawQuarterBackdrop, withCachedDateFormats, withoutInitialScroll, withRenderCenter, clearLabelFormats } from './zoom';
 import type GanttForBasesPlugin from './main';
 import { PALETTE_VARS, barShades, setBarShades, slotsResembling, type BarShades } from './colors';
@@ -22,14 +22,14 @@ import { PALETTE_VARS, barShades, setBarShades, slotsResembling, type BarShades 
 // ── Drag moves the whole dependency chain ──
 // Frappe's get_all_dependent_tasks marks each level as seen before filtering
 // the next one to process, so it stops after direct dependents: dragging a
-// task moves its children but not its grandchildren. Walk the full chain.
+// note moves its children but not its grandchildren. Walk the full chain.
 const ganttDeps = Gantt.prototype as unknown as {
 	dependency_map: Record<string, string[] | undefined>;
-	get_all_dependent_tasks(taskId: string): string[];
+	get_all_dependent_tasks(noteId: string): string[];
 };
-ganttDeps.get_all_dependent_tasks = function (this: typeof ganttDeps, taskId: string): string[] {
-	const seen = new Set<string>([taskId]);
-	const queue = [taskId];
+ganttDeps.get_all_dependent_tasks = function (this: typeof ganttDeps, noteId: string): string[] {
+	const seen = new Set<string>([noteId]);
+	const queue = [noteId];
 	while (queue.length) {
 		for (const child of this.dependency_map[queue.shift()!] ?? []) {
 			if (!seen.has(child)) {
@@ -38,7 +38,7 @@ ganttDeps.get_all_dependent_tasks = function (this: typeof ganttDeps, taskId: st
 			}
 		}
 	}
-	seen.delete(taskId);
+	seen.delete(noteId);
 	return [...seen];
 };
 
@@ -47,14 +47,14 @@ ganttDeps.get_all_dependent_tasks = function (this: typeof ganttDeps, taskId: st
 // date_utils.add(gantt_start, x/column_width*step, unit), which parseInt()s
 // the count. That truncates float noise in Week view (Saturday → Friday)
 // and, in Month/Year view, whole months/years: every drag snaps the start
-// to the 1st and collapses short tasks. Instead, shift the pre-drag dates
+// to the 1st and collapses short notes. Instead, shift the pre-drag dates
 // by how far each edge moved, in whole days (whole weeks when zoomed out
 // past days, see dragSnapDays). Frappe positions a bar's start
 // with a calendar mapping (day D of a month at D/31 of its column) but sizes
 // it with 30-day months, so the start shift follows the mapping and a
 // resized end follows the width math; that way the redrawn bar lands where
 // it was released in every view. An edge that didn't move keeps its date,
-// and a move keeps the task's length. Bar isn't exported, so its prototype
+// and a move keeps the note's length. Bar isn't exported, so its prototype
 // is patched from the first rendered bar.
 interface FrappeBar {
 	/** ox/owidth are set by Frappe on mousedown, before any date is computed. */
@@ -223,7 +223,7 @@ interface UndoFileChange {
 	next: Record<string, string | number>;
 }
 
-/** One undo-able user gesture (a single drag can touch several dependent tasks at once). */
+/** One undo-able user gesture (a single drag can touch several dependent notes at once). */
 interface UndoBatch {
 	description: string;
 	changes: UndoFileChange[];
@@ -290,8 +290,8 @@ export class GanttChartView extends BasesView {
 	private ganttEl: HTMLElement;
 	private gantt: Gantt | null = null;
 	private configSnapshot = '';
-	private currentTasks: GanttTask[] = [];
-	private taskMap: Map<string, GanttTask> = new Map();
+	private currentNotes: GanttNote[] = [];
+	private noteMap: Map<string, GanttNote> = new Map();
 	/**
 	 * True from the first on_date_change of a drag until the mouseup that
 	 * ends it. While true, onDataUpdated skips rebuilding the chart (which
@@ -333,8 +333,8 @@ export class GanttChartView extends BasesView {
 	/** Longest note body rendered in the hover popup's scrollable preview. */
 	private static readonly PREVIEW_MAX_CHARS = 5000;
 	private readonly shadeCache = new Map<string, BarShades>();
-	/** Task the hover popup was last filled for, so a late preview of another note is dropped. */
-	private popupTaskId: string | null = null;
+	/** Note the hover popup was last filled for, so a late preview of another note is dropped. */
+	private popupNoteId: string | null = null;
 
 	constructor(controller: QueryController, containerEl: HTMLElement, private plugin: GanttForBasesPlugin) {
 		super(controller);
@@ -376,15 +376,15 @@ export class GanttChartView extends BasesView {
 			if (!(evt.target as Element).closest('.popup-wrapper')) return;
 			evt.preventDefault();
 			evt.stopPropagation();
-			const ganttTask = this.popupTaskId ? this.findTask(this.popupTaskId) : null;
-			if (ganttTask && !ganttTask.id.startsWith(GROUP_HEADER_PREFIX)) {
-				void this.app.workspace.openLinkText(ganttTask.filePath, '', false);
+			const ganttNote = this.popupNoteId ? this.findNote(this.popupNoteId) : null;
+			if (ganttNote && !ganttNote.id.startsWith(GROUP_HEADER_PREFIX)) {
+				void this.app.workspace.openLinkText(ganttNote.filePath, '', false);
 			}
 		}, true);
 		this.registerDomEvent(this.ganttEl, 'mousedown', (evt) => {
 			this.mouseDownPos = { x: evt.clientX, y: evt.clientY };
 			// Frappe reports a click on a date column on mousedown of any button,
-			// and Ctrl+click is a right-click on macOS: only a plain left click creates a task.
+			// and Ctrl+click is a right-click on macOS: only a plain left click creates a note.
 			this.mouseDownIsPrimary = evt.button === 0 && !evt.ctrlKey;
 		}, true);
 		// Bubble phase on document, so Frappe's own mouseup handler on the
@@ -424,8 +424,8 @@ export class GanttChartView extends BasesView {
 			document.removeEventListener('mouseup', handler);
 		}
 		this.capturedGlobalHandlers = [];
-		this.currentTasks = [];
-		this.taskMap.clear();
+		this.currentNotes = [];
+		this.noteMap.clear();
 		this.undoStack = [];
 		this.pendingDrag = null;
 		this.isDragging = false;
@@ -443,7 +443,7 @@ export class GanttChartView extends BasesView {
 
 	/** Push plugin settings into the live chart. Frappe reads these at drag start, so no re-render is needed. */
 	applyPluginSettings(): void {
-		if (this.gantt) this.gantt.options.move_dependencies = this.plugin.settings.moveDependentTasks;
+		if (this.gantt) this.gantt.options.move_dependencies = this.plugin.settings.moveDependentNotes;
 	}
 
 	/**
@@ -452,20 +452,20 @@ export class GanttChartView extends BasesView {
 	 * formula, e.g. from task counts, can't be written). On unless turned off.
 	 */
 	private editableProgressProperty(): string | null {
-		const config = this.getTaskMapperConfig();
+		const config = this.getNoteMapperConfig();
 		if (this.config.get('editProgress') === false || !config.showProgress) return null;
 		const property = config.progressProperty;
 		return property && isNoteProperty(property) ? this.extractPropertyName(property) : null;
 	}
 
-	/** Write a task's progress (0–100) with undo, from the progress handle or the context menu. */
-	private setProgress(task: GanttTask, progress: number): void {
+	/** Write a note's progress (0–100) with undo, from the progress handle or the context menu. */
+	private setProgress(note: GanttNote, progress: number): void {
 		const propName = this.editableProgressProperty();
 		if (!propName) return;
 		const pct = Math.max(0, Math.min(100, Math.round(progress)));
-		// From the note, not task.progress: Frappe works on our task objects
+		// From the note, not note.progress: Frappe works on our note objects
 		// and has already set the new value there when on_progress_change fires.
-		const file = this.app.vault.getFileByPath(task.filePath);
+		const file = this.app.vault.getFileByPath(note.filePath);
 		const stored = Number(file ? this.app.metadataCache.getFileCache(file)?.frontmatter?.[propName] : NaN);
 		const previous = Number.isFinite(stored) ? Math.round(stored) : 0;
 		if (pct === previous) {
@@ -474,10 +474,10 @@ export class GanttChartView extends BasesView {
 			return;
 		}
 		const batch: UndoBatch = {
-			description: `Set progress of "${task.label}" to ${pct}%`,
-			changes: [{ filePath: task.filePath, previous: { [propName]: previous }, next: { [propName]: pct } }],
+			description: `Set progress of "${note.label}" to ${pct}%`,
+			changes: [{ filePath: note.filePath, previous: { [propName]: previous }, next: { [propName]: pct } }],
 		};
-		void this.writeFrontmatter(task.filePath, batch.changes[0].next);
+		void this.writeFrontmatter(note.filePath, batch.changes[0].next);
 		this.undoStack.push(batch);
 		if (this.undoStack.length > GanttChartView.MAX_UNDO_ENTRIES) this.undoStack.shift();
 		this.showUndoNotice(batch.description);
@@ -660,16 +660,16 @@ export class GanttChartView extends BasesView {
 		else this.gantt.$container.scrollTop = state.top;
 	}
 
-	/** Public: create a new task at today's date (for command palette). */
-	createTaskAtToday(): void {
-		const config = this.getTaskMapperConfig();
+	/** Public: create a new note at today's date (from the right-click menu). */
+	createNoteAtToday(): void {
+		const config = this.getNoteMapperConfig();
 		if (!config.startProperty) {
 			new Notice('Configure a start date property first.');
 			return;
 		}
 		const today = formatDateForFrontmatter(new Date());
 		const propName = this.extractPropertyName(config.startProperty);
-		void this.createFileForView('New task', (frontmatter: Record<string, unknown>) => {
+		void this.createFileForView('New note', (frontmatter: Record<string, unknown>) => {
 			if (isNoteProperty(config.startProperty!)) frontmatter[propName] = today;
 			if (config.endProperty && isNoteProperty(config.endProperty)) {
 				const endPropName = this.extractPropertyName(config.endProperty);
@@ -687,7 +687,7 @@ export class GanttChartView extends BasesView {
 			return;
 		}
 
-		const config = this.getTaskMapperConfig();
+		const config = this.getNoteMapperConfig();
 		const colors = this.syncColors(config.colorByProperty);
 		this.updateFixedColorStyles();
 		const colorFor = (value: string): BarColor => {
@@ -696,30 +696,30 @@ export class GanttChartView extends BasesView {
 		};
 		const newSnapshot = JSON.stringify(config) + '|' + this.getDisplayConfigSnapshot();
 
-		// Build tasks (potentially from grouped data)
-		let tasks: GanttTask[];
+		// Build notes (potentially from grouped data)
+		let notes: GanttNote[];
 		const groups = this.data.groupedData;
 		const hasGroups = groups.length > 1 || (groups.length === 1 && groups[0].hasKey());
 		if (hasGroups) {
-			tasks = [];
+			notes = [];
 			for (let i = 0; i < groups.length; i++) {
 				const group = groups[i];
-				const groupTasks = mapEntriesToTasks(group.entries, config, colorFor);
-				if (groupTasks.length === 0) continue;
+				const groupNotes = mapEntriesToNotes(group.entries, config, colorFor);
+				if (groupNotes.length === 0) continue;
 				const label = group.hasKey() ? String(group.key) : 'Ungrouped';
-				const header = createGroupHeaderTask(label, i, groupTasks);
-				if (header) tasks.push(header);
-				tasks.push(...groupTasks);
+				const header = createGroupHeaderBar(label, i, groupNotes);
+				if (header) notes.push(header);
+				notes.push(...groupNotes);
 			}
 		} else {
-			tasks = mapEntriesToTasks(this.data.data, config, colorFor);
+			notes = mapEntriesToNotes(this.data.data, config, colorFor);
 		}
 
-		this.currentTasks = tasks;
-		this.taskMap.clear();
-		for (const t of tasks) this.taskMap.set(t.id, t);
+		this.currentNotes = notes;
+		this.noteMap.clear();
+		for (const t of notes) this.noteMap.set(t.id, t);
 
-		if (tasks.length === 0) {
+		if (notes.length === 0) {
 			this.renderEmptyState(config);
 			return;
 		}
@@ -732,20 +732,20 @@ export class GanttChartView extends BasesView {
 			// Only data changed, not config — refresh in place.
 			// Frappe's refresh() re-renders via change_view_mode() with no
 			// "maintain_pos", which jumps back to the chart's original
-			// scroll_to (earliest task / today) — e.g. right after every
+			// scroll_to (earliest note / today) — e.g. right after every
 			// drag's write — and recomputes the grid start from the new
-			// task range. Keep the date at the left edge in place instead.
+			// bar range. Keep the date at the left edge in place instead.
 			const gantt = this.gantt;
-			this.zoom.rerenderInPlace(() => gantt.refresh(tasks));
+			this.zoom.rerenderInPlace(() => gantt.refresh(notes));
 			this.afterRender();
 		} else {
 			// Config changed or first render — recreate
 			this.configSnapshot = newSnapshot;
-			this.initGantt(tasks);
+			this.initGantt(notes);
 		}
 	}
 
-	private getTaskMapperConfig(): TaskMapperConfig {
+	private getNoteMapperConfig(): NoteMapperConfig {
 		let startProperty = this.config.getAsPropertyId('startDate');
 		let endProperty = this.config.getAsPropertyId('endDate');
 		let labelProperty = this.config.getAsPropertyId('label');
@@ -889,7 +889,7 @@ export class GanttChartView extends BasesView {
 		});
 	}
 
-	private initGantt(tasks: GanttTask[]): void {
+	private initGantt(notes: GanttNote[]): void {
 		// Clear previous chart
 		if (this.gantt) {
 			this.gantt.clear();
@@ -909,8 +909,8 @@ export class GanttChartView extends BasesView {
 		const barHeight = (this.config.get('barHeight') as number) || 30;
 		const showProgress = (this.config.get('showProgress') as boolean) ?? false;
 
-		// Calculate earliest task date to scroll to
-		const earliestDate = this.getEarliestTaskDate(tasks);
+		// Calculate earliest note date to scroll to
+		const earliestDate = this.getEarliestNoteDate(notes);
 
 		const options: GanttOptions = {
 			...this.zoom.ganttOptions(),
@@ -930,7 +930,7 @@ export class GanttChartView extends BasesView {
 			// Enhanced options
 			arrow_curve: 15,
 			auto_move_label: true,
-			move_dependencies: this.plugin.settings.moveDependentTasks,
+			move_dependencies: this.plugin.settings.moveDependentNotes,
 			hover_on_date: true,
 			popup_on: 'hover',
 
@@ -942,63 +942,63 @@ export class GanttChartView extends BasesView {
 				this.renderPopup(ctx, showProgress);
 			},
 
-			on_click: (task) => {
+			on_click: (note) => {
 				// A release after moving the mouse is a drag, not a click.
 				if (this.lastGestureMoved) return;
-				// Ignore group header phantom tasks
-				if (task.id.startsWith(GROUP_HEADER_PREFIX)) return;
-				const ganttTask = this.findTask(task.id);
-				if (ganttTask) {
-					void this.app.workspace.openLinkText(ganttTask.filePath, '', false);
+				// Ignore group header rows
+				if (note.id.startsWith(GROUP_HEADER_PREFIX)) return;
+				const ganttNote = this.findNote(note.id);
+				if (ganttNote) {
+					void this.app.workspace.openLinkText(ganttNote.filePath, '', false);
 				}
 			},
 
-			on_date_change: (task, start, end) => {
-				if (task.id.startsWith(GROUP_HEADER_PREFIX)) return;
-				const ganttTask = this.findTask(task.id);
-				if (!ganttTask) return;
+			on_date_change: (note, start, end) => {
+				if (note.id.startsWith(GROUP_HEADER_PREFIX)) return;
+				const ganttNote = this.findNote(note.id);
+				if (!ganttNote) return;
 
-				const mapperConfig = this.getTaskMapperConfig();
+				const mapperConfig = this.getNoteMapperConfig();
 				const updates: Record<string, string> = {};
 				const previous: Record<string, string> = {};
 
 				// A bar drawn from the planned start moves that; the start date stays as it was.
-				const startProperty = ganttTask.startsPlanned ? mapperConfig.plannedStartProperty : mapperConfig.startProperty;
+				const startProperty = ganttNote.startsPlanned ? mapperConfig.plannedStartProperty : mapperConfig.startProperty;
 				if (startProperty && isNoteProperty(startProperty)) {
 					const propName = this.extractPropertyName(startProperty);
-					previous[propName] = ganttTask.start;
+					previous[propName] = ganttNote.start;
 					updates[propName] = formatDateForFrontmatter(start);
 				}
-				// A task without an end date only gets one once its end is
+				// A note without an end date only gets one once its end is
 				// resized; moving the bar keeps it open-ended.
 				const newStart = formatDateForFrontmatter(start);
 				const newEnd = formatDateForFrontmatter(end);
-				const resized = daysBetween(newStart, newEnd) !== daysBetween(ganttTask.start, ganttTask.end);
+				const resized = daysBetween(newStart, newEnd) !== daysBetween(ganttNote.start, ganttNote.end);
 				// Resizing when no note has an end property yet starts one.
 				const endProperty = mapperConfig.endProperty ?? (resized ? this.newEndProperty(mapperConfig.startProperty) : null);
-				if (endProperty && isNoteProperty(endProperty) && (ganttTask.hasEnd || resized)) {
+				if (endProperty && isNoteProperty(endProperty) && (ganttNote.hasEnd || resized)) {
 					const propName = this.extractPropertyName(endProperty);
-					previous[propName] = ganttTask.hasEnd ? ganttTask.end : '';
+					previous[propName] = ganttNote.hasEnd ? ganttNote.end : '';
 					updates[propName] = newEnd;
 				}
 
 				// Written once on mouseup by finishDrag(), not per tick.
-				const description = moveDescription(ganttTask.label, {
-					startsPlanned: ganttTask.startsPlanned,
-					startMoved: newStart !== ganttTask.start,
+				const description = moveDescription(ganttNote.label, {
+					startsPlanned: ganttNote.startsPlanned,
+					startMoved: newStart !== ganttNote.start,
 				});
-				this.recordDragChange(ganttTask.filePath, description, previous, updates);
+				this.recordDragChange(ganttNote.filePath, description, previous, updates);
 			},
 
 			// Fired once, on release of the progress handle.
-			on_progress_change: (task, progress) => {
-				if (task.id.startsWith(GROUP_HEADER_PREFIX)) return;
-				const ganttTask = this.findTask(task.id);
-				if (ganttTask) this.setProgress(ganttTask, progress);
+			on_progress_change: (note, progress) => {
+				if (note.id.startsWith(GROUP_HEADER_PREFIX)) return;
+				const ganttNote = this.findNote(note.id);
+				if (ganttNote) this.setProgress(ganttNote, progress);
 			},
 
 			on_date_click: (dateStr: string) => {
-				if (this.mouseDownIsPrimary) this.createTaskAtDate(dateStr);
+				if (this.mouseDownIsPrimary) this.createNoteAtDate(dateStr);
 			},
 		};
 
@@ -1024,7 +1024,7 @@ export class GanttChartView extends BasesView {
 			const halfViewDays = (this.ganttEl.clientWidth || 1000) / 2 / this.zoom.pxPerDay;
 			const center = new Date(viewStart.getTime() + halfViewDays * 86_400_000);
 			const create = (): Gantt => withRenderCenter(center, () =>
-				withCachedDateFormats(() => new Gantt(this.ganttEl, tasks, options)));
+				withCachedDateFormats(() => new Gantt(this.ganttEl, notes, options)));
 			this.gantt = savedScroll ? withoutInitialScroll(create) : create();
 			patchBarDateMath(this.gantt);
 			patchDragSnap(this.gantt);
@@ -1032,7 +1032,7 @@ export class GanttChartView extends BasesView {
 		} catch (e) {
 			console.error('Gantt for Bases: failed to initialize chart', e);
 			this.ganttEl.empty();
-			this.renderEmptyState(this.getTaskMapperConfig());
+			this.renderEmptyState(this.getNoteMapperConfig());
 			return;
 		} finally {
 			document.addEventListener = origAdd;
@@ -1053,8 +1053,8 @@ export class GanttChartView extends BasesView {
 		// On unless turned off in the view's options.
 		const showOriginalStart = this.config.get('showOriginalStart') !== false;
 		drawQuarterBackdrop(this.gantt);
-		for (const task of this.currentTasks) {
-			if (task.originalStart && showOriginalStart) this.drawOriginalStart(task);
+		for (const note of this.currentNotes) {
+			if (note.originalStart && showOriginalStart) this.drawOriginalStart(note);
 		}
 	}
 
@@ -1062,27 +1062,27 @@ export class GanttChartView extends BasesView {
 
 	/** Render content inside Frappe Gantt's hover popup. */
 	private renderPopup(ctx: PopupContext, showProgress: boolean): void {
-		const ganttTask = this.findTask(ctx.task.id);
-		// The preview sits outside the parts Frappe refills, so drop the previous task's.
+		const ganttNote = this.findNote(ctx.task.id);
+		// The preview sits outside the parts Frappe refills, so drop the previous note's.
 		this.ganttEl.querySelector('.popup-wrapper .gantt-popup-preview')?.remove();
-		this.popupTaskId = ctx.task.id;
+		this.popupNoteId = ctx.task.id;
 
 		// Group headers: just show the label
-		if (!ganttTask || ganttTask.id.startsWith(GROUP_HEADER_PREFIX)) {
-			// ctx.task.name is already escaped by the task mapper.
-			const title = ganttTask ? escapeHtml(ganttTask.label) : ctx.task.name;
+		if (!ganttNote || ganttNote.id.startsWith(GROUP_HEADER_PREFIX)) {
+			// ctx.task.name is already escaped by the note mapper.
+			const title = ganttNote ? escapeHtml(ganttNote.label) : ctx.task.name;
 			ctx.set_title(`<strong>${title}</strong>`);
 			return;
 		}
 
 		// Title
-		ctx.set_title(escapeHtml(ganttTask.label));
+		ctx.set_title(escapeHtml(ganttNote.label));
 
 		// Subtitle: date range + duration
 		const start = ctx.task._start;
 		const end = ctx.task._end;
 		if (start && end) {
-			const { lastDay, days } = taskDaySpan(start, end);
+			const { lastDay, days } = barDaySpan(start, end);
 			ctx.set_subtitle(
 				`${this.formatDisplayDate(start)} &rarr; ${this.formatDisplayDate(lastDay)} &middot; ${days} day${days !== 1 ? 's' : ''}`
 			);
@@ -1091,7 +1091,7 @@ export class GanttChartView extends BasesView {
 		// Details: original start + progress bar + dependencies + hint
 		const parts: string[] = [];
 
-		const originalStart = ganttTask.originalStart ? parseObsidianDate(ganttTask.originalStart) : null;
+		const originalStart = ganttNote.originalStart ? parseObsidianDate(ganttNote.originalStart) : null;
 		if (originalStart) {
 			parts.push(`<div class="gantt-popup-deps">Started ${this.formatDisplayDate(originalStart)}</div>`);
 		}
@@ -1106,34 +1106,34 @@ export class GanttChartView extends BasesView {
 			);
 		}
 
-		// Frappe turns the comma-separated string into an array when it loads the tasks.
+		// Frappe turns the comma-separated string into an array when it loads the notes.
 		const deps: unknown = ctx.task.dependencies;
 		const depIds = Array.isArray(deps) ? deps as string[] : typeof deps === 'string' ? deps.split(',') : [];
 		const depNames = depIds
 			.map(d => d.trim()).filter(Boolean)
 			.map(depId => {
-				const depTask = this.findTask(depId);
-				return escapeHtml(depTask ? depTask.label : depId);
+				const depNote = this.findNote(depId);
+				return escapeHtml(depNote ? depNote.label : depId);
 			});
 		if (depNames.length > 0) {
 			parts.push(`<div class="gantt-popup-deps">Depends on: ${depNames.join(', ')}</div>`);
 		}
 
-		const props = this.renderPopupProperties(ganttTask);
+		const props = this.renderPopupProperties(ganttNote);
 		if (props) parts.push(props);
 
 		parts.push(`<div class="gantt-popup-hint">Click to open &middot; Right-click for options</div>`);
 		ctx.set_details(parts.join(''));
 
 		// Async: render a markdown preview of the note body
-		if (this.plugin.settings.showNotePreview) void this.renderPopupPreview(ganttTask);
+		if (this.plugin.settings.showNotePreview) void this.renderPopupPreview(ganttNote);
 	}
 
 	/** The note properties chosen in the settings, as escaped HTML rows (null when there are none to show). */
-	private renderPopupProperties(ganttTask: GanttTask): string | null {
+	private renderPopupProperties(ganttNote: GanttNote): string | null {
 		const wanted = this.plugin.settings.popupProperties;
 		if (wanted.length === 0) return null;
-		const file = this.app.vault.getFileByPath(ganttTask.filePath);
+		const file = this.app.vault.getFileByPath(ganttNote.filePath);
 		const frontmatter = file ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
 		if (!frontmatter) return null;
 		const keys = Object.keys(frontmatter);
@@ -1186,10 +1186,10 @@ export class GanttChartView extends BasesView {
 	}
 
 	/** A faint line from the note's own start to its bar, which begins at the planned start. */
-	private drawOriginalStart(task: GanttTask): void {
+	private drawOriginalStart(note: GanttNote): void {
 		const gantt = this.gantt;
-		const start = task.originalStart ? parseObsidianDate(task.originalStart) : null;
-		const bar = this.ganttEl.querySelector<SVGRectElement>(`.bar-wrapper[data-id="${task.id}"] .bar`);
+		const start = note.originalStart ? parseObsidianDate(note.originalStart) : null;
+		const bar = this.ganttEl.querySelector<SVGRectElement>(`.bar-wrapper[data-id="${note.id}"] .bar`);
 		if (!gantt || !start || !bar?.parentElement) return;
 		const barX = Number(bar.getAttribute('x'));
 		// It can start before the grid, which only spans the bars.
@@ -1229,13 +1229,13 @@ export class GanttChartView extends BasesView {
 	}
 
 	/** Asynchronously render a truncated markdown preview in the popup. */
-	private async renderPopupPreview(ganttTask: GanttTask): Promise<void> {
-		const file = this.app.vault.getFileByPath(ganttTask.filePath);
+	private async renderPopupPreview(ganttNote: GanttNote): Promise<void> {
+		const file = this.app.vault.getFileByPath(ganttNote.filePath);
 		if (!file) return;
 
 		const content = await this.app.vault.cachedRead(file);
 		// The popup may have moved on to another bar while the note was read.
-		if (this.popupTaskId !== ganttTask.id) return;
+		if (this.popupNoteId !== ganttNote.id) return;
 
 		// Strip frontmatter
 		const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)/);
@@ -1255,8 +1255,8 @@ export class GanttChartView extends BasesView {
 
 		const previewDiv = popupEl.createDiv({ cls: 'gantt-popup-preview' });
 
-		await MarkdownRenderer.render(this.app, preview, previewDiv, ganttTask.filePath, this);
-		if (this.popupTaskId !== ganttTask.id) {
+		await MarkdownRenderer.render(this.app, preview, previewDiv, ganttNote.filePath, this);
+		if (this.popupNoteId !== ganttNote.id) {
 			previewDiv.remove();
 			return;
 		}
@@ -1287,11 +1287,11 @@ export class GanttChartView extends BasesView {
 			const barWrapper = target.closest('.bar-wrapper');
 
 			if (barWrapper) {
-				const taskId = barWrapper.getAttribute('data-id');
-				if (taskId) {
-					const ganttTask = this.findTask(taskId);
-					if (ganttTask && !ganttTask.id.startsWith(GROUP_HEADER_PREFIX)) {
-						this.showTaskContextMenu(evt, ganttTask);
+				const noteId = barWrapper.getAttribute('data-id');
+				if (noteId) {
+					const ganttNote = this.findNote(noteId);
+					if (ganttNote && !ganttNote.id.startsWith(GROUP_HEADER_PREFIX)) {
+						this.showNoteContextMenu(evt, ganttNote);
 						return;
 					}
 				}
@@ -1301,15 +1301,15 @@ export class GanttChartView extends BasesView {
 		});
 	}
 
-	/** Context menu for a specific task bar. */
-	private showTaskContextMenu(evt: MouseEvent, task: GanttTask): void {
+	/** Context menu for a specific note bar. */
+	private showNoteContextMenu(evt: MouseEvent, note: GanttNote): void {
 		const menu = new Menu();
 
 		menu.addItem((item) => {
 			item.setTitle('Open note')
 				.setIcon('file-text')
 				.onClick(() => {
-					void this.app.workspace.openLinkText(task.filePath, '', false);
+					void this.app.workspace.openLinkText(note.filePath, '', false);
 				});
 		});
 
@@ -1317,7 +1317,7 @@ export class GanttChartView extends BasesView {
 			item.setTitle('Open in new tab')
 				.setIcon('file-plus')
 				.onClick(() => {
-					void this.app.workspace.openLinkText(task.filePath, '', true);
+					void this.app.workspace.openLinkText(note.filePath, '', true);
 				});
 		});
 
@@ -1327,8 +1327,8 @@ export class GanttChartView extends BasesView {
 			for (const pct of [0, 25, 50, 75, 100]) {
 				menu.addItem((item) => {
 					item.setTitle(`Set progress: ${pct}%`)
-						.setChecked(Math.round(task.progress ?? 0) === pct)
-						.onClick(() => this.setProgress(task, pct));
+						.setChecked(Math.round(note.progress ?? 0) === pct)
+						.onClick(() => this.setProgress(note, pct));
 				});
 			}
 			menu.addSeparator();
@@ -1348,9 +1348,9 @@ export class GanttChartView extends BasesView {
 		const menu = new Menu();
 
 		menu.addItem((item) => {
-			item.setTitle('Create new task')
+			item.setTitle('Create new note')
 				.setIcon('plus')
-				.onClick(() => this.createTaskAtToday());
+				.onClick(() => this.createNoteAtToday());
 		});
 
 		menu.addSeparator();
@@ -1366,9 +1366,9 @@ export class GanttChartView extends BasesView {
 
 	// ── Click-to-create ───────────────────────────────────────────────
 
-	/** Create a new task at a specific date (from on_date_click). */
-	private createTaskAtDate(dateStr: string): void {
-		const config = this.getTaskMapperConfig();
+	/** Create a new note at a specific date (from on_date_click). */
+	private createNoteAtDate(dateStr: string): void {
+		const config = this.getNoteMapperConfig();
 		if (!config.startProperty) {
 			new Notice('Configure a start date property first.');
 			return;
@@ -1379,7 +1379,7 @@ export class GanttChartView extends BasesView {
 		const formattedDate = parsed ? formatDateForFrontmatter(parsed) : dateStr;
 
 		const propName = this.extractPropertyName(config.startProperty);
-		void this.createFileForView('New task', (frontmatter: Record<string, unknown>) => {
+		void this.createFileForView('New note', (frontmatter: Record<string, unknown>) => {
 			if (isNoteProperty(config.startProperty!)) frontmatter[propName] = formattedDate;
 			if (config.endProperty && isNoteProperty(config.endProperty)) {
 				const endPropName = this.extractPropertyName(config.endProperty);
@@ -1390,10 +1390,10 @@ export class GanttChartView extends BasesView {
 
 	// ── Helpers ───────────────────────────────────────────────────────
 
-	/** Find the earliest start date string among tasks, for initial scroll. */
-	private getEarliestTaskDate(tasks: GanttTask[]): string | null {
+	/** Find the earliest start date string among notes, for initial scroll. */
+	private getEarliestNoteDate(notes: GanttNote[]): string | null {
 		let earliest: string | null = null;
-		for (const t of tasks) {
+		for (const t of notes) {
 			if (!earliest || t.start < earliest) {
 				earliest = t.start;
 			}
@@ -1401,8 +1401,8 @@ export class GanttChartView extends BasesView {
 		return earliest;
 	}
 
-	private findTask(id: string): GanttTask | undefined {
-		return this.taskMap.get(id);
+	private findNote(id: string): GanttNote | undefined {
+		return this.noteMap.get(id);
 	}
 
 	/**
@@ -1437,7 +1437,7 @@ export class GanttChartView extends BasesView {
 		});
 	}
 
-	private renderEmptyState(config: TaskMapperConfig): void {
+	private renderEmptyState(config: NoteMapperConfig): void {
 		if (this.gantt) {
 			this.gantt.clear();
 			this.gantt = null;
@@ -1460,7 +1460,7 @@ export class GanttChartView extends BasesView {
 			});
 		} else {
 			el.createEl('p', {
-				text: 'No tasks with valid dates found.',
+				text: 'No notes with valid dates found.',
 			});
 			el.createEl('p', {
 				cls: 'gantt-empty-hint',
@@ -1471,7 +1471,7 @@ export class GanttChartView extends BasesView {
 }
 
 /**
- * Undo-notice text for a dragged task. Says so when the planned start was
+ * Undo-notice text for a dragged note. Says so when the planned start was
  * moved instead of the start date, so it is clear which property changed.
  */
 export function moveDescription(

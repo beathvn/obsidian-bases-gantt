@@ -1,12 +1,12 @@
 import { App, PluginSettingTab, type SettingDefinitionItem } from 'obsidian';
 import type GanttForBasesPlugin from './main';
 import { GanttChartView } from './gantt-view';
-import { MAX_FIXED_COLORS } from './task-mapper';
+import { MAX_FIXED_COLORS } from './note-mapper';
 
 export interface GanttForBasesSettings {
-	/** Dragging a task also shifts every task that depends on it, directly or transitively. */
-	moveDependentTasks: boolean;
-	/** How many days a task without an end date is drawn. */
+	/** Dragging a note also shifts every note that depends on it, directly or transitively. */
+	moveDependentNotes: boolean;
+	/** How many days a note without an end date is drawn. */
 	defaultDurationDays: number;
 	/**
 	 * Color slot per shown value of the color-by property, per view
@@ -31,7 +31,7 @@ export interface ValueColor {
 }
 
 export const DEFAULT_SETTINGS: GanttForBasesSettings = {
-	moveDependentTasks: false,
+	moveDependentNotes: false,
 	defaultDurationDays: 1,
 	colorAssignments: {},
 	valueColors: [],
@@ -52,13 +52,13 @@ export class GanttForBasesSettingTab extends PluginSettingTab {
 		const valueColors = this.plugin.settings.valueColors;
 		return [
 			{
-				name: 'Move dependent tasks along',
-				desc: 'Off by default: dragging a task only changes that task. Turn on to shift every task that depends on it by the same amount too, which rewrites the dates of those notes.',
-				control: { type: 'toggle', key: 'moveDependentTasks' },
+				name: 'Move dependent notes along',
+				desc: 'Off by default: dragging a bar only changes that note. Turn on to shift every note that depends on it by the same amount too, which rewrites the dates of those notes.',
+				control: { type: 'toggle', key: 'moveDependentNotes' },
 			},
 			{
 				name: 'Default length without end date',
-				desc: 'How many days a task without an end date is drawn. Dragging its right edge sets a real end date.',
+				desc: 'How many days a note without an end date is drawn. Dragging its right edge sets a real end date.',
 				control: {
 					type: 'number',
 					key: 'defaultDurationDays',
@@ -74,7 +74,7 @@ export class GanttForBasesSettingTab extends PluginSettingTab {
 				items: [
 					{
 						name: 'Show details on hover',
-						desc: 'Show a popup with the task\'s dates, progress and dependencies when you rest the pointer on a bar. The two settings below only apply while this is on.',
+						desc: 'Show a popup with the note\'s dates, progress and dependencies when you rest the pointer on a bar. The two settings below only apply while this is on.',
 						control: { type: 'toggle', key: 'showPopup' },
 					},
 					{
@@ -143,10 +143,10 @@ export class GanttForBasesSettingTab extends PluginSettingTab {
 			return;
 		}
 		await super.setControlValue(key, value);
-		if (key === 'moveDependentTasks') {
+		if (key === 'moveDependentNotes') {
 			for (const view of GanttChartView.instances) view.applyPluginSettings();
 		} else if (key === 'defaultDurationDays') {
-			// Part of the task mapping, so open charts are rebuilt.
+			// Part of the note mapping, so open charts are rebuilt.
 			for (const view of GanttChartView.instances) view.onDataUpdated();
 		}
 	}

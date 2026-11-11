@@ -22,7 +22,7 @@ Frappe draws two header rows per view mode. The plugin replaces the lower row's 
 | What | When | How |
 |---|---|---|
 | Weekends | from Week zoom on (≥ 4 px/day) | one rect per weekend (`highlight_holidays` patch); below that a day is too narrow and it would just be stripes |
-| Day under the pointer | from Week zoom on | one rect moved on `mousemove`; a click there creates a task ([Commands and menus](commands-and-menus.md)) |
+| Day under the pointer | from Week zoom on | one rect moved on `mousemove`; a click there creates a note ([Commands and menus](commands-and-menus.md)) |
 | Quarters | Month zoom | every other calendar quarter faintly shaded, with a large `Q1`–`Q4` label (`drawQuarterBackdrop()`) |
 
 The quarter backdrop is drawn at the end of Frappe's grid layer, above the row backgrounds and below arrows and bars. Frappe rebuilds the SVG on every render, so `afterRender()` draws it again each time.
@@ -35,9 +35,9 @@ The quarter backdrop is drawn at the end of Frappe's grid layer, above the row b
 ## Where the chart opens
 
 1. With saved state for this view on this device: the saved zoom and left-edge date ([Zoom → Persistence](zoom.md#persistence)).
-2. Otherwise: Day zoom, scrolled to the earliest task, or to today when no task has a date.
+2. Otherwise: Day zoom, scrolled to the earliest note, or to today when no note has a date.
 
-Data updates (a drag's write, a note edited elsewhere) refresh the chart in place and keep the date at the left edge (`ZoomController.rerenderInPlace()`). Frappe's own `refresh()` would jump back to the earliest task.
+Data updates (a drag's write, a note edited elsewhere) refresh the chart in place and keep the date at the left edge (`ZoomController.rerenderInPlace()`). Frappe's own `refresh()` would jump back to the earliest note.
 
 ## Theme
 

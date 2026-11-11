@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { config, entry } from './support/entries';
 import { loadedPlugin } from './support/plugin';
-import { MAX_FIXED_COLORS, mapEntriesToTasks, type ColorFor } from '../src/task-mapper';
+import { MAX_FIXED_COLORS, mapEntriesToNotes, type ColorFor } from '../src/note-mapper';
 import { slotsResembling } from '../src/colors';
 
 describe('bar color classes', () => {
 	const classOf = (status: string | null, colorFor: ColorFor) =>
-		mapEntriesToTasks(
+		mapEntriesToNotes(
 			[entry('A.md', { start: '2025-01-01', end: '2025-01-05', status })],
 			config({ colorByProperty: 'note.status' }),
 			colorFor,
@@ -31,12 +31,12 @@ describe('bar color classes', () => {
 	});
 
 	it('leaves bars uncolored without Color by', () => {
-		const [task] = mapEntriesToTasks(
+		const [note] = mapEntriesToNotes(
 			[entry('A.md', { start: '2025-01-01', end: '2025-01-05', status: 'doing' })],
 			config(),
 			() => ({ slot: 4 }),
 		);
-		expect(task.custom_class).toBe('');
+		expect(note.custom_class).toBe('');
 	});
 });
 

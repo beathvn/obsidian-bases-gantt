@@ -4,12 +4,12 @@ These docs are organized **by feature: one page per feature**. Each page briefly
 
 ## Features
 
-- [Task mapping](task-mapping.md): notes → bars, auto-detection, dependencies, one-day tasks, grouping, empty state
+- [Note mapping](note-mapping.md): notes → bars, auto-detection, dependencies, one-day notes, grouping, empty state
 - [Zoom](zoom.md): continuous zoom, persisted per device
 - [Timeline](timeline.md): header labels and week numbers, weekend and quarter shading, today, where the chart opens, theme
 - [Dragging](dragging.md): moving and resizing bars, snapping, dependents, undo, clicks vs. drags
 - [Progress](progress.md): progress from numbers or formulas, optional editing
-- [Open-ended tasks](open-ended-tasks.md): tasks without an end date
+- [Open-ended notes](open-ended-notes.md): notes without an end date
 - [Planned start](planned-start.md): projects picked up again later
 - [Colors](colors.md): stable automatic colors and fixed value colors
 - [Hover popup](hover-popup.md): details, properties and note preview
@@ -18,14 +18,14 @@ These docs are organized **by feature: one page per feature**. Each page briefly
 
 ## Architecture
 
-Gantt for Bases is an Obsidian Bases view. Bases runs the query and hands the view its entries (notes). The plugin turns them into tasks, draws them with [Frappe Gantt](https://github.com/frappe/gantt), and writes drags back into the notes' frontmatter.
+Gantt for Bases is an Obsidian Bases view. Bases runs the query and hands the view its entries (notes). The plugin turns them into bars, draws them with [Frappe Gantt](https://github.com/frappe/gantt), and writes drags back into the notes' frontmatter.
 
 ```mermaid
 flowchart LR
     Bases[(Bases query)] -->|entries| View[GanttChartView<br/>gantt-view.ts]
-    View -->|entries + config| Mapper[task-mapper.ts]
-    Mapper -->|GanttTask list| View
-    View -->|tasks + options| Frappe[Frappe Gantt<br/>patched]
+    View -->|entries + config| Mapper[note-mapper.ts]
+    Mapper -->|GanttNote list| View
+    View -->|notes + options| Frappe[Frappe Gantt<br/>patched]
     Zoom[ZoomController<br/>zoom.ts] <-->|view mode, column width| Frappe
     Frappe -->|on_date_change| View
     View -->|processFrontMatter| Notes[(Note frontmatter)]
@@ -39,7 +39,7 @@ flowchart LR
 |---|---|
 | `main.ts` | Registers the view, commands and settings tab. Owns plugin settings and color assignments. |
 | `gantt-view.ts` | The view: render lifecycle, Frappe options and patches, drags, popup, menus. |
-| `task-mapper.ts` | Pure mapping of Bases entries to Frappe tasks: dates, dependencies, colors, ordering. |
+| `note-mapper.ts` | Pure mapping of Bases entries to Frappe's bars: dates, dependencies, colors, ordering. |
 | `zoom.ts` | Continuous zoom on top of Frappe's fixed view modes, date ↔ x math, and keeping renders cheap (grid window, weekend shading, header labels). |
 | `colors.ts` | Bar shades resolved per color, and which palette colors resemble the user's fixed colors. |
 | `settings.ts` | Settings schema, defaults and the settings tab. |
@@ -49,8 +49,8 @@ flowchart LR
 
 `onDataUpdated()` runs whenever Bases has new data or the view config changes:
 
-1. `getTaskMapperConfig()` resolves the properties (configured or auto-detected).
-2. `mapEntriesToTasks()` builds the tasks, per group when the base is grouped.
+1. `getNoteMapperConfig()` resolves the properties (configured or auto-detected).
+2. `mapEntriesToNotes()` builds the notes, per group when the base is grouped.
 3. If the config snapshot is unchanged, the chart is refreshed in place, keeping the scroll position. Otherwise it is rebuilt (`initGantt`).
 4. `afterRender()` finishes what Frappe draws: it removes Frappe's bar grow animations and adds the quarter backdrop and original-start lines.
 
@@ -67,10 +67,14 @@ Frappe has few extension points, so behavior is changed by replacing methods:
 
 | State | Stored in | Why |
 |---|---|---|
-| Task data | Note frontmatter | It's the user's data; Bases reads it back. |
+| Note data | Note frontmatter | It's the user's data; Bases reads it back. |
 | Properties, display toggles | View config in the `.base` file | Per view, shared via sync. |
 | Scroll position, zoom | Local storage, keyed by base path and view name | Per device, changes constantly; keeps the `.base` file out of git noise. |
 | Plugin settings, color assignments | Plugin `data.json` | Global to the vault. |
+
+## Wording
+
+Each Bases entry is a **note**, drawn as a **bar**. "Task" is not used for either, because in Obsidian a task is a checkbox. It stays only where it is someone else's word: the checkbox workflow in [Progress](progress.md) (the Task Count plugin, `tasks` and `tasks_completed`), Frappe's own API (`FrappeTask`, `get_all_dependent_tasks`, `update_task`, `bar.task`, `ctx.task`).
 
 ## Tests
 

@@ -1,6 +1,6 @@
 # Colors
 
-With **Color by** set, each value of that property gets its own color. Colors stay stable as values come and go, and specific values can be given a fixed color. When Color by isn't set, a text property named like `status`, `priority`, `type`, `category`, `phase` or `stage` is used ([Task mapping](task-mapping.md)). Without one, every bar uses the theme's accent color.
+With **Color by** set, each value of that property gets its own color. Colors stay stable as values come and go, and specific values can be given a fixed color. When Color by isn't set, a text property named like `status`, `priority`, `type`, `category`, `phase` or `stage` is used ([Note mapping](note-mapping.md)). Without one, every bar uses the theme's accent color.
 
 ## Rules
 
@@ -17,7 +17,7 @@ flowchart LR
     C[colors.ts<br/>slotsResembling] -->|blocked slots| P
     P -->|value → slot| V
     P -.->|debounced save| D[(data.json<br/>colorAssignments)]
-    V -->|colorFor| M[task-mapper]
+    V -->|colorFor| M[note-mapper]
     M -->|class gantt-color-N<br/>or gantt-fixed-N| R[Frappe bars]
 ```
 

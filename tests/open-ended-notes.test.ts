@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { anyColor, config, entry } from './support/entries';
-import { mapEntriesToTasks } from '../src/task-mapper';
+import { mapEntriesToNotes } from '../src/note-mapper';
 
 const map = (props: Record<string, string>, overrides = {}) =>
-	mapEntriesToTasks([entry('A.md', props)], config(overrides), anyColor)[0];
+	mapEntriesToNotes([entry('A.md', props)], config(overrides), anyColor)[0];
 
-describe('open-ended tasks', () => {
-	it('draws a task without an end date with the default length', () => {
+describe('open-ended notes', () => {
+	it('draws a note without an end date with the default length', () => {
 		expect(map({ start: '2025-01-01' }, { defaultDurationDays: 5 })).toMatchObject({
 			start: '2025-01-01',
 			end: '2025-01-05',
@@ -38,7 +38,7 @@ describe('open-ended tasks', () => {
 	});
 
 	it('draws a zero-day default length as one day', () => {
-		const task = map({ start: '2025-01-01' }, { defaultDurationDays: 0 });
-		expect(task).toMatchObject({ end: '2025-01-01', hasEnd: false });
+		const note = map({ start: '2025-01-01' }, { defaultDurationDays: 0 });
+		expect(note).toMatchObject({ end: '2025-01-01', hasEnd: false });
 	});
 });

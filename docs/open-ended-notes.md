@@ -1,10 +1,10 @@
-# Open-ended tasks
+# Open-ended notes
 
 A note with a start date but no end date is still drawn, with a default length. Moving it keeps it open-ended. Resizing its right edge gives it a real end date.
 
 ## How
 
-- **Drawing** (`task-mapper.ts`): with no end, `end = start + defaultDurationDays - 1` (plugin setting, default 1; at least one day), and `hasEnd = false`. The end is the last day drawn, because Frappe counts a date-only end as a full day, so a default of 1 is one column. It's a fixed day count rather than calendar months, so the bar's length doesn't change when it's moved.
+- **Drawing** (`note-mapper.ts`): with no end, `end = start + defaultDurationDays - 1` (plugin setting, default 1; at least one day), and `hasEnd = false`. The end is the last day drawn, because Frappe counts a date-only end as a full day, so a default of 1 is one column. It's a fixed day count rather than calendar months, so the bar's length doesn't change when it's moved.
 - **Moving** (`on_date_change`): only the start is written while `hasEnd` is false and the length is unchanged.
 - **Resizing:** a changed length counts as resized, so the end is written too.
 

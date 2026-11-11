@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { anyColor, config, entry } from './support/entries';
-import { mapEntriesToTasks } from '../src/task-mapper';
+import { mapEntriesToNotes } from '../src/note-mapper';
 
 const map = (props: Record<string, string>) =>
-	mapEntriesToTasks(
+	mapEntriesToNotes(
 		[entry('A.md', props)],
 		config({ plannedStartProperty: 'note.plannedStart' }),
 		anyColor,

@@ -16,7 +16,7 @@ sequenceDiagram
     loop mousemove
         F->>P: get_snap_position(dx)
         F->>P: compute_start_end_date()
-        F->>V: on_date_change(task, start, end)
+        F->>V: on_date_change(note, start, end)
         V->>V: recordDragChange (kept in memory)
     end
     U->>V: mouseup
@@ -44,9 +44,9 @@ A resized edge can't cross the other one. `compute_start_end_date` passes the ne
 
 In Month and Year view a week isn't a fixed number of pixels, because of the calendar mapping. `patchDragSnap` therefore snaps a moved start to the exact x of its new date (`xForDate`), so the bar doesn't jump when it's redrawn. A resized end snaps in uniform week steps, because Frappe sizes bars with 30-day months.
 
-## Dependent tasks
+## Dependent notes
 
-Frappe's `get_all_dependent_tasks` only finds direct dependents, so it is patched to walk the whole chain. Whether dependents move along at all is the plugin setting **Move dependent tasks along** (`options.move_dependencies`), off by default and applied to open charts without a rebuild.
+Frappe's `get_all_dependent_tasks` only finds direct dependents, so it is patched to walk the whole chain. Whether dependents move along at all is the plugin setting **Move dependent notes along** (`options.move_dependencies`), off by default and applied to open charts without a rebuild.
 
 ## Undo
 
@@ -64,5 +64,5 @@ Frappe fires a click on a bar after any release, including a drag that snapped b
 ## What gets written
 
 - **Start:** the start property, or the planned start if the bar begins there ([Planned start](planned-start.md)).
-- **End:** only if the note has one, or if the bar was resized ([Open-ended tasks](open-ended-tasks.md)).
+- **End:** only if the note has one, or if the bar was resized ([Open-ended notes](open-ended-notes.md)).
 - Computed properties (`file.*`, `formula.*`) are never written.

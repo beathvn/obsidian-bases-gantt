@@ -2,8 +2,8 @@ import { NullValue, DateValue, type BasesEntry, type BasesPropertyId, type Value
 import type { FrappeTask } from 'frappe-gantt';
 import { parseObsidianDate, formatDateForGantt } from './date-utils';
 
-/** Extended task type carrying the original file path for click-to-open. */
-export interface GanttTask extends FrappeTask {
+/** A note ready to draw as a bar, with the original file path for click-to-open. */
+export interface GanttNote extends FrappeTask {
 	/**
 	 * HTML-escaped label. Frappe Gantt writes `name` with innerHTML (bar label,
 	 * popup), so it must never hold raw note text. Use `label` for plain text.
@@ -20,8 +20,8 @@ export interface GanttTask extends FrappeTask {
 	originalStart?: string;
 }
 
-/** Configuration for mapping entries to tasks, derived from view options. */
-export interface TaskMapperConfig {
+/** Configuration for mapping entries to notes, derived from view options. */
+export interface NoteMapperConfig {
 	startProperty: BasesPropertyId | null;
 	/** Optional later start for planning (e.g. a project picked up again); the bar starts here when set. */
 	plannedStartProperty: BasesPropertyId | null;
@@ -31,7 +31,7 @@ export interface TaskMapperConfig {
 	colorByProperty: BasesPropertyId | null;
 	progressProperty: BasesPropertyId | null;
 	showProgress: boolean;
-	/** How many days a task without an end date is drawn (fixed, so moving it keeps its length). */
+	/** How many days a note without an end date is drawn (fixed, so moving it keeps its length). */
 	defaultDurationDays: number;
 }
 
@@ -65,13 +65,13 @@ export function extractRawValue(val: Value | null): string | null {
 }
 
 /**
- * Make a stable task ID from a file path. Frappe Gantt puts the ID into CSS
+ * Make a stable note ID from a file path. Frappe Gantt puts the ID into CSS
  * class names it looks up with querySelector and splits dependency lists on
  * commas, so every character other than letters, digits and "-" is encoded
  * as "_<hex>_" ("Notes/A.md" → "Notes_2f_A_2e_md"). Encoding "_" as well
  * keeps the IDs of different paths different.
  */
-function makeTaskId(filePath: string): string {
+function makeNoteId(filePath: string): string {
 	return filePath.replace(/[^A-Za-z0-9-]/gu, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
 }
 
@@ -99,24 +99,24 @@ export function escapeHtml(str: string): string {
 		.replace(/'/g, '&#39;');
 }
 
-/** Prefix used to identify group header phantom tasks. */
+/** Prefix used to identify group header rows. */
 export const GROUP_HEADER_PREFIX = '__group__';
 
 /**
- * Create a phantom task that acts as a visual group header row.
- * It spans the full date range of the group's real tasks.
+ * Create a phantom bar that acts as a visual group header row.
+ * It spans the full date range of the group's real notes.
  */
-export function createGroupHeaderTask(
+export function createGroupHeaderBar(
 	groupLabel: string,
 	groupIndex: number,
-	groupTasks: GanttTask[],
-): GanttTask | null {
-	if (groupTasks.length === 0) return null;
+	groupNotes: GanttNote[],
+): GanttNote | null {
+	if (groupNotes.length === 0) return null;
 
-	// Find the min start and max end across all tasks in the group
-	let minStart = groupTasks[0].start;
-	let maxEnd = groupTasks[0].end;
-	for (const t of groupTasks) {
+	// Find the min start and max end across all notes in the group
+	let minStart = groupNotes[0].start;
+	let maxEnd = groupNotes[0].end;
+	for (const t of groupNotes) {
 		if (t.start < minStart) minStart = t.start;
 		if (t.end > maxEnd) maxEnd = t.end;
 	}
@@ -137,30 +137,30 @@ export function createGroupHeaderTask(
 }
 
 /**
- * Map an array of BasesEntry objects to GanttTask objects for Frappe Gantt.
+ * Map an array of BasesEntry objects to GanttNote objects for Frappe Gantt.
  */
-export function mapEntriesToTasks(
+export function mapEntriesToNotes(
 	entries: BasesEntry[],
-	config: TaskMapperConfig,
+	config: NoteMapperConfig,
 	colorFor: ColorFor,
-): GanttTask[] {
+): GanttNote[] {
 	if (!config.startProperty) return [];
 
 	// First pass: build maps for dependency resolution.
-	// We map both basename and path-without-extension → task ID so that
+	// We map both basename and path-without-extension → note ID so that
 	// [[Note]] and [[folder/Note]] wiki-links both resolve correctly.
 	// When basenames collide, the basename key maps to the LAST entry,
 	// but the full-path key is always unambiguous.
 	const nameToId = new Map<string, string>();
 	for (const entry of entries) {
-		const id = makeTaskId(entry.file.path);
+		const id = makeNoteId(entry.file.path);
 		nameToId.set(entry.file.basename, id);
-		// Path without extension, e.g. "projects/Task A"
+		// Path without extension, e.g. "projects/Note A"
 		const pathNoExt = entry.file.path.replace(/\.[^.]+$/, '');
 		nameToId.set(pathNoExt, id);
 	}
 
-	const tasks: GanttTask[] = [];
+	const notes: GanttNote[] = [];
 
 	for (const entry of entries) {
 		const ownStart = parseObsidianDate(extractRawValue(entry.getValue(config.startProperty)));
@@ -177,8 +177,8 @@ export function mapEntriesToTasks(
 			endDate = parseObsidianDate(extractRawValue(endVal));
 		}
 		// Frappe draws an end date as a full day, so `end` is the last day of
-		// the bar: a task starting and ending on the same day is one day long.
-		// Default: if no end date, show the task with the configured length
+		// the bar: a note starting and ending on the same day is one day long.
+		// Default: if no end date, show the note with the configured length
 		const hasEnd = endDate != null;
 		if (!endDate) {
 			endDate = new Date(startDate);
@@ -257,8 +257,8 @@ export function mapEntriesToTasks(
 			}
 		}
 
-		tasks.push({
-			id: makeTaskId(entry.file.path),
+		notes.push({
+			id: makeNoteId(entry.file.path),
 			name: escapeHtml(name),
 			label: name,
 			start: formatDateForGantt(startDate),
@@ -273,51 +273,51 @@ export function mapEntriesToTasks(
 		});
 	}
 
-	return sortByDependencies(tasks);
+	return sortByDependencies(notes);
 }
 
 /**
- * Start-date order, adjusted so every task comes after its dependencies.
+ * Start-date order, adjusted so every note comes after its dependencies.
  * This ensures dependency arrows always point downward in the chart.
  */
-function sortByDependencies(tasks: GanttTask[]): GanttTask[] {
-	if (tasks.length <= 1) return tasks;
+function sortByDependencies(notes: GanttNote[]): GanttNote[] {
+	if (notes.length <= 1) return notes;
 
-	const taskMap = new Map<string, GanttTask>();
-	for (const t of tasks) taskMap.set(t.id, t);
+	const noteMap = new Map<string, GanttNote>();
+	for (const t of notes) noteMap.set(t.id, t);
 
-	// Parse each task's dependency IDs into a Set
+	// Parse each note's dependency IDs into a Set
 	const depsOf = new Map<string, Set<string>>();
-	for (const t of tasks) {
+	for (const t of notes) {
 		const deps = new Set<string>();
 		if (t.dependencies) {
 			for (const d of t.dependencies.split(',')) {
 				const id = d.trim();
-				if (id && taskMap.has(id)) deps.add(id);
+				if (id && noteMap.has(id)) deps.add(id);
 			}
 		}
 		depsOf.set(t.id, deps);
 	}
 
-	const sorted: GanttTask[] = [];
+	const sorted: GanttNote[] = [];
 	const placed = new Set<string>();
-	const remaining = new Set(tasks.map(t => t.id));
+	const remaining = new Set(notes.map(t => t.id));
 
-	// Place one task at a time: the earliest-starting task whose dependencies
-	// are all placed. This keeps plain start-date order and only pushes a task
+	// Place one note at a time: the earliest-starting note whose dependencies
+	// are all placed. This keeps plain start-date order and only pushes a note
 	// down when it would otherwise sit above one of its prerequisites.
 	while (remaining.size > 0) {
-		let next: GanttTask | null = null;
+		let next: GanttNote | null = null;
 		for (const id of remaining) {
 			const deps = depsOf.get(id)!;
 			if (![...deps].every(d => placed.has(d))) continue;
-			const t = taskMap.get(id)!;
+			const t = noteMap.get(id)!;
 			if (!next || t.start.localeCompare(next.start) < 0) next = t;
 		}
 
 		if (!next) {
 			// Circular dependency — just append the rest by start date
-			const rest = [...remaining].map(id => taskMap.get(id)!);
+			const rest = [...remaining].map(id => noteMap.get(id)!);
 			rest.sort((a, b) => a.start.localeCompare(b.start));
 			sorted.push(...rest);
 			break;

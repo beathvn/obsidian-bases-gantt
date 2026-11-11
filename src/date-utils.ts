@@ -43,11 +43,11 @@ export function parseObsidianDate(value: unknown): Date | null {
 }
 
 /**
- * The days a drawn task covers, from Frappe's start and `_end`, which for a
+ * The days a drawn note covers, from Frappe's start and `_end`, which for a
  * date-only end is the midnight after the last day. Whole calendar days, so a
  * daylight saving change doesn't shift the count.
  */
-export function taskDaySpan(start: Date, end: Date): { lastDay: Date; days: number } {
+export function barDaySpan(start: Date, end: Date): { lastDay: Date; days: number } {
 	const justBeforeEnd = new Date(end.getTime() - 1000);
 	const lastDay = new Date(justBeforeEnd.getFullYear(), justBeforeEnd.getMonth(), justBeforeEnd.getDate());
 	const midnight = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());

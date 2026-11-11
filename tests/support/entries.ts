@@ -1,6 +1,6 @@
 import type { BasesEntry, BasesPropertyId } from 'obsidian';
 import { DateValue, NullValue, NumberValue, StringValue, type Value } from './obsidian';
-import type { ColorFor, TaskMapperConfig } from '../../src/task-mapper';
+import type { ColorFor, NoteMapperConfig } from '../../src/note-mapper';
 
 type PropertyValue = string | number | Date | null;
 
@@ -29,7 +29,7 @@ export function entry(path: string, properties: Record<string, PropertyValue> = 
 }
 
 /** Mapper config with only a start date; override what a test needs. */
-export function config(overrides: Partial<Record<keyof TaskMapperConfig, unknown>> = {}): TaskMapperConfig {
+export function config(overrides: Partial<Record<keyof NoteMapperConfig, unknown>> = {}): NoteMapperConfig {
 	return {
 		startProperty: 'note.start',
 		plannedStartProperty: null,
@@ -41,7 +41,7 @@ export function config(overrides: Partial<Record<keyof TaskMapperConfig, unknown
 		showProgress: false,
 		defaultDurationDays: 1,
 		...overrides,
-	} as TaskMapperConfig;
+	} as NoteMapperConfig;
 }
 
 /** Every value gets palette slot 0. */

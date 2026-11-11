@@ -17,23 +17,23 @@ describe('dragSnapDays', () => {
 
 describe('dayShiftForX', () => {
 	const ganttStart = new Date(2025, 0, 1);
-	const taskStart = new Date(2025, 0, 10);
+	const barStart = new Date(2025, 0, 10);
 	const addDays = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 
 	it('is 0 when the bar did not move', () => {
-		expect(dayShiftForX(chartAt(ganttStart, MONTH_VIEW), taskStart, 0)).toBe(0);
+		expect(dayShiftForX(chartAt(ganttStart, MONTH_VIEW), barStart, 0)).toBe(0);
 	});
 
 	it('converts pixels to whole days in Day view', () => {
-		expect(dayShiftForX(chartAt(ganttStart, DAY_VIEW), taskStart, 3 * DAY_VIEW.column_width)).toBe(3);
+		expect(dayShiftForX(chartAt(ganttStart, DAY_VIEW), barStart, 3 * DAY_VIEW.column_width)).toBe(3);
 	});
 
 	it('rounds to the nearest day', () => {
-		expect(dayShiftForX(chartAt(ganttStart, DAY_VIEW), taskStart, 2.6 * DAY_VIEW.column_width)).toBe(3);
+		expect(dayShiftForX(chartAt(ganttStart, DAY_VIEW), barStart, 2.6 * DAY_VIEW.column_width)).toBe(3);
 	});
 
 	it('moves backwards', () => {
-		expect(dayShiftForX(chartAt(ganttStart, WEEK_VIEW), taskStart, -WEEK_VIEW.column_width)).toBe(-7);
+		expect(dayShiftForX(chartAt(ganttStart, WEEK_VIEW), barStart, -WEEK_VIEW.column_width)).toBe(-7);
 	});
 
 	it.each([
@@ -42,12 +42,12 @@ describe('dayShiftForX', () => {
 		['Year', YEAR_VIEW, 120],
 	])('in %s view finds the day drawn where the bar was dropped (%s days)', (_, view, days) => {
 		const chart = chartAt(ganttStart, view);
-		const dx = xForDate(chart, addDays(taskStart, days)) - xForDate(chart, taskStart);
-		expect(dayShiftForX(chart, taskStart, dx)).toBe(days);
+		const dx = xForDate(chart, addDays(barStart, days)) - xForDate(chart, barStart);
+		expect(dayShiftForX(chart, barStart, dx)).toBe(days);
 	});
 });
 
-describe('dependent tasks (get_all_dependent_tasks)', () => {
+describe('dependent notes (get_all_dependent_tasks)', () => {
 	const dependentsOf = (map: Record<string, string[]>, id: string) =>
 		(Gantt.prototype as unknown as { get_all_dependent_tasks(id: string): string[] })
 			.get_all_dependent_tasks.call({ dependency_map: map }, id)
@@ -61,15 +61,15 @@ describe('dependent tasks (get_all_dependent_tasks)', () => {
 		expect(dependentsOf({ a: ['b'], b: ['c'], c: ['d'] }, 'a')).toEqual(['b', 'c', 'd']);
 	});
 
-	it('lists a task reached on two paths once', () => {
+	it('lists a note reached on two paths once', () => {
 		expect(dependentsOf({ a: ['b', 'c'], b: ['d'], c: ['d'] }, 'a')).toEqual(['b', 'c', 'd']);
 	});
 
-	it('stops at cycles and leaves out the dragged task', () => {
+	it('stops at cycles and leaves out the dragged note', () => {
 		expect(dependentsOf({ a: ['b'], b: ['a'] }, 'a')).toEqual(['b']);
 	});
 
-	it('finds nothing for a task without dependents', () => {
+	it('finds nothing for a note without dependents', () => {
 		expect(dependentsOf({ a: ['b'] }, 'b')).toEqual([]);
 	});
 });

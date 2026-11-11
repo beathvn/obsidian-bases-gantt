@@ -10,18 +10,18 @@ describe('plugin settings', () => {
 		expect(plugin.settings).toEqual(DEFAULT_SETTINGS);
 	});
 
-	it('leaves dependent tasks in place and draws open-ended tasks one day long by default', () => {
-		expect(DEFAULT_SETTINGS).toMatchObject({ moveDependentTasks: false, defaultDurationDays: 1, showNotePreview: true, showPopup: true });
+	it('leaves dependent notes in place and draws open-ended notes one day long by default', () => {
+		expect(DEFAULT_SETTINGS).toMatchObject({ moveDependentNotes: false, defaultDurationDays: 1, showNotePreview: true, showPopup: true });
 	});
 
-	it('moves dependent tasks along when the setting was turned on', async () => {
-		const plugin = await loadedPlugin({ moveDependentTasks: true });
-		expect(plugin.settings.moveDependentTasks).toBe(true);
+	it('moves dependent notes along when the setting was turned on', async () => {
+		const plugin = await loadedPlugin({ moveDependentNotes: true });
+		expect(plugin.settings.moveDependentNotes).toBe(true);
 	});
 
 	it('keeps stored values over the defaults', async () => {
-		const plugin = await loadedPlugin({ moveDependentTasks: false, popupProperties: ['owner'] });
-		expect(plugin.settings).toMatchObject({ moveDependentTasks: false, popupProperties: ['owner'], defaultDurationDays: 1 });
+		const plugin = await loadedPlugin({ moveDependentNotes: false, popupProperties: ['owner'] });
+		expect(plugin.settings).toMatchObject({ moveDependentNotes: false, popupProperties: ['owner'], defaultDurationDays: 1 });
 	});
 
 	it('never changes the defaults through loaded settings', async () => {
@@ -68,7 +68,7 @@ describe('view options', () => {
 });
 
 describe('drag notice wording', () => {
-	it('names the task', () => {
+	it('names the note', () => {
 		expect(moveDescription('Design', { startsPlanned: false, startMoved: true })).toBe('Moved "Design"');
 	});
 
@@ -93,6 +93,14 @@ describe('plugin settings tab', () => {
 			['Properties on hover', 'popupProperties'],
 			['Note preview on hover', 'showNotePreview'],
 		]);
+	});
+
+	it('talks about notes, never tasks (a task is a checkbox in Obsidian)', async () => {
+		const plugin = await loadedPlugin();
+		const tab = new GanttForBasesSettingTab({} as never, plugin);
+		const text = JSON.stringify(tab.getSettingDefinitions(), (key: string, value: unknown): unknown => (typeof value === 'function' || key === 'key' ? undefined : value));
+		expect(text).toContain('Move dependent notes along');
+		expect(text).not.toMatch(/task/i);
 	});
 
 	it('stores whether the hover popup is shown', async () => {

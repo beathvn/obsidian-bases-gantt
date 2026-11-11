@@ -216,7 +216,7 @@ function startOfUnit(date: Date, unit: string): Date {
 	return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-// Frappe computes the grid range once per view mode change: the task range
+// Frappe computes the grid range once per view mode change: the bar range
 // plus a fixed per-mode padding (7 days in Day view, 2 years in Year view).
 // At an arbitrary zoom that can leave the grid narrower than the viewport, or
 // leave no room to keep the date under the cursor in place. Pad each side by
@@ -677,7 +677,7 @@ export class ZoomController {
 	}
 
 	/**
-	 * Run a Frappe re-render (e.g. refresh with new tasks) without the view
+	 * Run a Frappe re-render (e.g. refresh with new notes) without the view
 	 * jumping: the date at the left edge stays at the left edge.
 	 */
 	rerenderInPlace(render: () => void): void {

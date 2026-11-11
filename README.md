@@ -4,7 +4,7 @@ Turn your Obsidian notes into an interactive Gantt chart — drag to reschedule,
 
 Requires **Obsidian 1.13+**.
 
-![Gantt chart showing tasks with dependencies and color coding](screenshots/gantt-demo.png)
+![Gantt chart showing notes with dependencies and color coding](screenshots/gantt-demo.png)
 
 ---
 
@@ -73,14 +73,14 @@ The chart works with **whole days**. Use plain dates like `2026-03-01`. A time o
 
 | Property | What it does | Example |
 |----------|-------------|---------|
-| **Start date** | When the task begins. Without this, the note won't appear on the chart. | `start-date: 2026-03-01` |
+| **Start date** | When the note begins. Without this, the note won't appear on the chart. | `start-date: 2026-03-01` |
 
 ### Optional
 
 | Property | What it does | Example |
 |----------|-------------|---------|
-| **End date** | When the task ends. If omitted, the bar is drawn with a default length (1 day, adjustable in the plugin settings). | `end-date: 2026-03-05` |
-| **Progress** | Completion percentage (0–100). Enables the progress bar on the task. Can also be a formula, for example [computed from the note's checkboxes](#progress-from-checkboxes-optional-workflow). | `progress: 40` |
+| **End date** | When the note ends. If omitted, the bar is drawn with a default length (1 day, adjustable in the plugin settings). | `end-date: 2026-03-05` |
+| **Progress** | Completion percentage (0–100). Enables the progress bar on the bar. Can also be a formula, for example [computed from the note's checkboxes](#progress-from-checkboxes-optional-workflow). | `progress: 40` |
 | **Dependencies** | Wiki-links to notes that must finish first. Shows arrows between bars. [How it works](#dependencies) | `depends-on: "[[Design]]"` |
 | **Status / Priority / etc.** | Any text property can be used to color-code the bars. | `status: In Progress` |
 | **Label** | Override the displayed name (defaults to the file name). | `label: "Phase 1 Research"` |
@@ -110,17 +110,17 @@ depends-on: "[[Design]]"
 ---
 ```
 
-An arrow now runs from Design to Build. To wait for several notes, list them: `depends-on: "[[Task A]], [[Task B]]"`.
+An arrow now runs from Design to Build. To wait for several notes, list them: `depends-on: "[[Note A]], [[Note B]]"`.
 
-- **Put the link on the later task.** The property lists the notes *this one waits for*.
+- **Put the link on the later note.** The property lists the notes *this one waits for*.
 - **Any property name works.** Names like `depends-on`, `blocked-by` or `after` are found automatically. Otherwise choose it under **Dependencies** in the view settings.
-- **Not `blocks`.** `blocks` says the opposite ("this task holds up Task C"), so its arrows would point backwards and it is not picked up automatically. Move the link to the later task as `depends-on` instead.
+- **Not `blocks`.** `blocks` says the opposite ("this note holds up Note C"), so its arrows would point backwards and it is not picked up automatically. Move the link to the later note as `depends-on` instead.
 - **Links to notes outside the base** are ignored, and so are links to notes in a different group.
 - Plain comma-separated names work too, but `[[links]]` are better, because Obsidian keeps them up to date when you rename a note.
 
-### One-day tasks
+### One-day notes
 
-A task that starts and ends on the same day is drawn as a one-day bar:
+A note that starts and ends on the same day is drawn as a one-day bar:
 
 ```yaml
 ---
@@ -129,9 +129,9 @@ end-date: 2026-03-15
 ---
 ```
 
-### Resuming a task later (optional)
+### Resuming a note later (optional)
 
-You can ignore this unless you have tasks you started a while ago and are now picking up again.
+You can ignore this unless you have notes you started a while ago and are now picking up again.
 
 Say a project began in January 2024, then sat untouched, and you plan to work on it again from November 2026. With only a start date, its bar would stretch across almost three years of nothing. Give the note a **planned start** instead:
 
@@ -186,11 +186,11 @@ formulas:
   progress: if(tasks > 0, tasks_completed / tasks * 100, 0)
 ```
 
-The `if` keeps notes without any tasks at 0% instead of dividing by zero. If you changed the property names in Task Count's settings, use those names here.
+The `if` keeps notes without any checkboxes at 0% instead of dividing by zero. If you changed the property names in Task Count's settings, use those names here.
 
 **Step 3: show it.** In the Gantt view's settings, turn on **Show progress** and set **Progress** to the formula `progress`.
 
-The bars now fill as you check off tasks. Because the percentage is calculated, it is read-only on the chart: no handle appears, and **Drag to set progress** only works for a plain number property.
+The bars now fill as you check off checkboxes. Because the percentage is calculated, it is read-only on the chart: no handle appears, and **Drag to set progress** only works for a plain number property.
 
 ---
 
@@ -215,13 +215,13 @@ Pinch on a trackpad, or hold `Ctrl`/`Cmd` and scroll, to zoom the timeline smoot
 
 ### Display Section
 
-- **Bar height** — How tall the task bars are (16–60 pixels)
-- **Show progress** — Toggle the progress bar overlay on tasks. Turns on by itself when a progress property is detected and you haven't set the toggle yet
+- **Bar height** — How tall the bars are (16–60 pixels)
+- **Show progress** — Toggle the progress overlay on the bars. Turns on by itself when a progress property is detected and you haven't set the toggle yet
 - **Drag to set progress** — When progress is shown, lets you change it on the chart by dragging a handle or from the right-click menu (on by default). Only works when **Progress** is a plain number property in the notes, not a formula
 
 ### Advanced
 
-Optional. Only needed for [tasks you pick up again later](#resuming-a-task-later-optional). Leave it alone otherwise.
+Optional. Only needed for [notes you pick up again later](#resuming-a-note-later-optional). Leave it alone otherwise.
 
 - **Planned start** — Which date property holds the day you resume. When a note has one, its bar begins there, and dragging the bar moves it instead of the start date. Defaults to a property named `plannedStart`.
 - **Show original start** — For bars that begin at a planned start, draw a faint dotted line back to the note's own start date (on by default; it only appears on those bars)
@@ -231,13 +231,13 @@ Optional. Only needed for [tasks you pick up again later](#resuming-a-task-later
 ## Interacting with the Chart
 
 ### Drag a bar left/right
-Reschedules the task — changes the start and end dates. The dates are written back to the note's frontmatter automatically. Only that task changes, unless you turn on **Move dependent tasks along** in the plugin settings: then every task that depends on it moves by the same amount, and those notes are rewritten too. Drags snap to whole days when the chart shows day columns, and to whole weeks when zoomed out further.
+Reschedules the note — changes the start and end dates. The dates are written back to the note's frontmatter automatically. Only that note changes, unless you turn on **Move dependent notes along** in the plugin settings: then every note that depends on it moves by the same amount, and those notes are rewritten too. Drags snap to whole days when the chart shows day columns, and to whole weeks when zoomed out further.
 
 ### Drag the left or right edge of a bar
-Resizes the task — the right edge changes the end date, the left edge the start date. On a task without an end date, dragging the right edge sets one. A bar can't be made shorter than one day: an edge stops at the other one.
+Resizes the note — the right edge changes the end date, the left edge the start date. On a note without an end date, dragging the right edge sets one. A bar can't be made shorter than one day: an edge stops at the other one.
 
 ### Undo
-Every drag shows a notice with an **Undo** button. The **Undo last change** command reverts the most recent drags too, up to 20 back. A drag that also moved dependent tasks is undone as one step.
+Every drag shows a notice with an **Undo** button. The **Undo last change** command reverts the most recent drags too, up to 20 back. A drag that also moved dependent notes is undone as one step.
 
 ### Click a bar
 Opens the note in the current tab.
@@ -249,18 +249,18 @@ Opens a context menu:
 - **Set progress** — quickly set to 0%, 25%, 50%, 75%, or 100% (unless **Drag to set progress** is off)
 - **Scroll to today** — jump the chart to today's date
 
-### Creating tasks
+### Creating notes
 
-There are two ways to add a task. They do the same thing and only differ in how you start and which date is used:
+There are two ways to add a note. They do the same thing and only differ in how you start and which date is used:
 
 | How | Date used |
 |-----|-----------|
-| Right-click an empty spot in the chart and choose **Create new task** | today |
+| Right-click an empty spot in the chart and choose **Create new note** | today |
 | Click an empty day column | the day you clicked |
 
 Clicking a day works from Week zoom inwards, where the day under the pointer is highlighted. At Month and Year zoom a day is too narrow to aim at.
 
-**What you get:** a new note called "New task", opened in a small window with its name highlighted, so you can type a name right away. It is created the same way as when you add a note with the **New** button of the base, so it goes wherever the base puts new notes. Its start date is set, and its end date too if the view has an end date property, to the same day, so it starts out as a one-day bar. Nothing else is filled in. Open the window's **Properties** to adjust the dates, or just drag the bar.
+**What you get:** a new note called "New note", opened in a small window with its name highlighted, so you can type a name right away. It is created the same way as when you add a note with the **New** button of the base, so it goes wherever the base puts new notes. Its start date is set, and its end date too if the view has an end date property, to the same day, so it starts out as a one-day bar. Nothing else is filled in. Open the window's **Properties** to adjust the dates, or just drag the bar.
 
 If the view has no start date property yet, you see a notice asking you to set one first.
 
@@ -272,9 +272,9 @@ The **Today** button in the chart's corner scrolls to today's date.
 ### Hover over a bar
 If enabled, shows a popup with:
 - Date range and duration
-- When the task started, if its bar begins at a planned start
+- When the note started, if its bar begins at a planned start
 - Progress bar (if enabled)
-- Dependencies (names of linked tasks)
+- Dependencies (names of linked notes)
 - The properties chosen under **Properties on hover** in the plugin settings
 - A scrollable, read-only preview of the note's content (can be turned off in the plugin settings)
 
@@ -285,9 +285,9 @@ With **Show progress** on (and **Drag to set progress** not turned off), a small
 
 ---
 
-## Grouping Tasks
+## Grouping Notes
 
-If you configure **grouping** in the view (e.g., group by `status`), the Gantt chart reflects this with **group headers** — visual section bars that span the full date range of their group's tasks.
+If you configure **grouping** in the view (e.g., group by `status`), the Gantt chart reflects this with **group headers** — visual section bars that span the full date range of their group's notes.
 
 ---
 
@@ -295,8 +295,8 @@ If you configure **grouping** in the view (e.g., group by `status`), the Gantt c
 
 Under **Settings → Community plugins → Gantt for Bases**:
 
-- **Move dependent tasks along** — Off by default, so dragging a task only changes that task. Turn on to shift every task that depends on it by the same amount too; those notes' dates are rewritten as well, and one Undo reverts them all.
-- **Default length without end date** — How many days a task without an end date is drawn (default 1).
+- **Move dependent notes along** — Off by default, so dragging a bar only changes that note. Turn on to shift every note that depends on it by the same amount too; those notes' dates are rewritten as well, and one Undo reverts them all.
+- **Default length without end date** — How many days a note without an end date is drawn (default 1).
 - **Hover** — Everything about the popup that appears when you rest on a bar lives here, not in the view:
   - **Show details on hover** — Turn the popup on or off (on by default).
   - **Properties on hover** — Note properties to show in it, separated by commas (e.g. `status, owner, priority`).
@@ -410,7 +410,7 @@ Open the view settings (gear icon) and select which property contains your start
 This can happen if date values include timezone information. Use the plain `YYYY-MM-DD` format (e.g., `2026-03-01`) without time components for best results.
 
 ### Dependency arrows point the wrong way
-The dependencies property must list the notes **this one waits for**, so put it on the later task (`depends-on: "[[Earlier task]]"`). A property that lists what a note blocks, like `blocks`, reads backwards.
+The dependencies property must list the notes **this one waits for**, so put it on the later note (`depends-on: "[[Earlier note]]"`). A property that lists what a note blocks, like `blocks`, reads backwards.
 
 ### Dependency arrows aren't showing
 - Make sure the dependency property uses wiki-link syntax: `depends-on: "[[Other Note]]"`

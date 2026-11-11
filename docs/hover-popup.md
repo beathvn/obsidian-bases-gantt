@@ -8,7 +8,7 @@ Unless turned off (plugin setting **Show details on hover**, on by default), res
 
 - **Properties:** plugin setting **Properties on hover**, read from the note's frontmatter cache. Missing ones are left out, and `[[links]]` show their name or alias.
 - **Preview:** plugin setting **Note preview on hover**. The body without frontmatter is rendered with `MarkdownRenderer`, up to 5000 characters. The bottom fades until it's scrolled to the end.
-- **Stale previews:** `popupTaskId` tracks the bar the popup is for. A preview that finishes after the pointer moved to another bar is dropped.
+- **Stale previews:** `popupNoteId` tracks the bar the popup is for. A preview that finishes after the pointer moved to another bar is dropped.
 
 ## Behavior (`patchPopup`)
 
