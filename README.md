@@ -298,9 +298,9 @@ Under **Settings → Community plugins → Gantt for Bases**:
 - **Move dependent notes along** — Off by default, so dragging a bar only changes that note. Turn on to shift every note that depends on it by the same amount too; those notes' dates are rewritten as well, and one Undo reverts them all.
 - **Default length without end date** — How many days a note without an end date is drawn (default 1).
 - **Hover** — Everything about the popup that appears when you rest on a bar lives here, not in the view:
-  - **Show details on hover** — Turn the popup on or off (on by default).
-  - **Properties on hover** — Note properties to show in it, separated by commas (e.g. `status, owner, priority`).
-  - **Note preview on hover** — Show a preview of the note's content in it (on by default).
+  - **Show details on hover** — Turn the popup on or off (on by default). While it's on, two more options appear:
+    - **Properties on hover** — Note properties to show in it, separated by commas (e.g. `status, owner, priority`).
+    - **Note preview on hover** — Show a preview of the note's content in it (on by default).
 - **Value colors** — Give specific values of the view's **Color by** property a fixed color (e.g. `done` → green). Matching ignores case. Values not listed here get a color automatically, which they keep while the value is in use, so adding new values never recolors existing bars. Automatic colors skip any palette color that looks like one you fixed. Up to 32 values can have a fixed color.
 
 ---

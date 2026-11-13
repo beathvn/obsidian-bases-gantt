@@ -50,6 +50,7 @@ export class GanttForBasesSettingTab extends PluginSettingTab {
 
 	getSettingDefinitions(): SettingDefinitionItem[] {
 		const valueColors = this.plugin.settings.valueColors;
+		const popupShown = () => this.plugin.settings.showPopup;
 		return [
 			{
 				name: 'Move dependent notes along',
@@ -74,18 +75,20 @@ export class GanttForBasesSettingTab extends PluginSettingTab {
 				items: [
 					{
 						name: 'Show details on hover',
-						desc: 'Show a popup with the note\'s dates, progress and dependencies when you rest the pointer on a bar. The two settings below only apply while this is on.',
+						desc: 'Show a popup with the note\'s dates, progress and dependencies when you rest the pointer on a bar.',
 						control: { type: 'toggle', key: 'showPopup' },
 					},
 					{
 						name: 'Properties on hover',
 						desc: 'Note properties to show in the popup, separated by commas. Properties a note doesn\'t have are left out.',
 						control: { type: 'text', key: 'popupProperties', placeholder: 'Example: status, owner, priority' },
+						visible: popupShown,
 					},
 					{
 						name: 'Note preview on hover',
 						desc: 'Show a scrollable preview of the note\'s content in the popup.',
 						control: { type: 'toggle', key: 'showNotePreview' },
+						visible: popupShown,
 					},
 				],
 			},
@@ -143,7 +146,10 @@ export class GanttForBasesSettingTab extends PluginSettingTab {
 			return;
 		}
 		await super.setControlValue(key, value);
-		if (key === 'moveDependentNotes') {
+		if (key === 'showPopup') {
+			// Shows or hides the other hover settings.
+			this.update();
+		} else if (key === 'moveDependentNotes') {
 			for (const view of GanttChartView.instances) view.applyPluginSettings();
 		} else if (key === 'defaultDurationDays') {
 			// Part of the note mapping, so open charts are rebuilt.

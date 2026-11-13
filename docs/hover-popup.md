@@ -32,4 +32,4 @@ stateDiagram-v2
 All three are plugin settings, in the **Hover** group:
 
 - **Show details on hover** (on by default): checked on every hover, returning `false` to Frappe, so no rebuild is needed. It was a view option before; a value stored in an old `.base` file is ignored.
-- **Properties on hover** and **Note preview on hover**.
+- **Properties on hover** and **Note preview on hover**: only shown while **Show details on hover** is on (`visible` on the definitions; toggling it calls `update()` on the tab).
